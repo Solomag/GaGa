@@ -12,7 +12,11 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settings = Settings()
     private let loader = StreamsFileLoader(filePath: AppPaths.streams.path)
     private lazy var player = Player(statusItem: statusItem)
+    private let power = PowerWatcher()
     private var windowController: MainWindowController?
+
+    /// The last streams tree read from disk, reused until the file changes.
+    private var streams: Result<StreamNode, Error>?
 
     // constant menu items:
     private lazy var showWindowItem = menuItem("Open GaGa Window", #selector(onShowWindowClicked))
@@ -56,12 +60,17 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         player.setMediaKeysEnabled(settings.mediaKeys)
 
         let window = MainWindowController(player: player) { [weak self] in
-            self?.loadStreams() ?? .success(StreamNode(group: ""))
+            self?.currentStreams() ?? .success(StreamNode(group: ""))
         }
 
         windowController = window
         player.onStateChanged = { [weak window] in window?.refreshControls() }
         window.show()
+
+        // stop for a closing lid or a sleeping machine, and come back after:
+        power.onSuspend = { [weak self] in self?.player.suspend() }
+        power.onResume = { [weak self] in self?.player.resume() }
+        power.start()
 
         if settings.autoPlay {
             player.play()
@@ -122,9 +131,14 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    /// Read the streams file. Shared by the menu and the window.
-    private func loadStreams() -> Result<StreamNode, Error> {
-        Result { try loader.load() }
+    /// The streams file, re-read only when it changed on disk. Shared by
+    /// the menu and the window, so that both show the same tree.
+    private func currentStreams() -> Result<StreamNode, Error> {
+        if streams == nil || loader.mustReload() {
+            streams = Result { try loader.load() }
+        }
+
+        return streams ?? .success(StreamNode(group: ""))
     }
 
     //
@@ -175,6 +189,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func buildAudioMenu() {
         volumeSlider.onChange = { [weak self] value in
             self?.player.volume = value
+            self?.windowController?.refreshControls()
         }
 
         let volumeItem = NSMenuItem()
@@ -200,10 +215,11 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// it is about to open, so that edits to the file show up right away.
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
+        volumeSlider.value = player.volume
 
         var canEdit = true
 
-        switch loadStreams() {
+        switch currentStreams() {
         case .success(let root):
             menu.addStreams(root, target: self, action: #selector(onStreamClicked(_:)))
 
@@ -294,6 +310,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func onReloadClicked() {
+        streams = nil
         windowController?.refresh()
     }
 

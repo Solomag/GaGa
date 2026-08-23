@@ -83,15 +83,8 @@ final class StreamsFileReader: INIReader {
         return root
     }
 
-    /// Read the file as text, accepting UTF-8 with or without a BOM
-    /// and falling back to Latin-1 so that a bad encoding is not fatal.
     private static func readText(filePath: String) throws -> String {
-        let data = try Data(contentsOf: URL(fileURLWithPath: filePath))
-        let text = String(data: data, encoding: .utf8)
-            ?? String(data: data, encoding: .isoLatin1)
-            ?? ""
-
-        return text.hasPrefix("\u{FEFF}") ? String(text.dropFirst()) : text
+        String(textData: try Data(contentsOf: URL(fileURLWithPath: filePath)))
     }
 
     private func resetState() {
@@ -188,13 +181,24 @@ final class StreamsFileLoader {
     let filePath: String
 
     private let reader = StreamsFileReader()
+    private var lastLoaded: Date?
 
     init(filePath: String) {
         self.filePath = filePath
     }
 
+    /// Whether the file changed since the last successful read. False keeps
+    /// the previous tree, so that reopening the menu does not disturb what
+    /// the window is showing.
+    func mustReload() -> Bool {
+        lastLoaded == nil || lastLoaded != modificationDate()
+    }
+
     /// Read the streams file, recreating it first when it doesn't exist.
     func load() throws -> StreamNode {
+        // reset, so that a failure to recreate invalidates the timestamp:
+        lastLoaded = nil
+
         // make a single attempt to recreate the file when needed:
         if !FileManager.default.fileExists(atPath: filePath) {
             try FileManager.default.createDirectory(
@@ -204,7 +208,23 @@ final class StreamsFileLoader {
             try Self.defaultStreams.write(toFile: filePath, atomically: true, encoding: .utf8)
         }
 
-        return try reader.read(filePath: filePath)
+        let stamp = modificationDate()
+
+        do {
+            let root = try reader.read(filePath: filePath)
+            lastLoaded = stamp
+            return root
+        } catch let error as StreamsFileReadError {
+            // the syntax stays wrong until the file changes, so there is
+            // no point in parsing it again on every menu:
+            lastLoaded = stamp
+            throw error
+        }
+    }
+
+    private func modificationDate() -> Date? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: filePath)
+        return attributes?[.modificationDate] as? Date
     }
 
     /// Written on first run, or when the streams file is deleted.

@@ -10,6 +10,8 @@ import AppKit
 final class MainWindowController: NSWindowController, NSOutlineViewDataSource,
                                   NSOutlineViewDelegate, NSWindowDelegate {
 
+    private static let frameName = NSWindow.FrameAutosaveName("GaGaMainWindow")
+
     private let player: Player
 
     /// Asked for a fresh streams tree when the window needs one.
@@ -36,8 +38,12 @@ final class MainWindowController: NSWindowController, NSOutlineViewDataSource,
         )
 
         window.title = "GaGa"
-        window.setFrameAutosaveName("GaGaMainWindow")
-        window.center()
+        window.setFrameAutosaveName(Self.frameName)
+
+        // setFrameAutosaveName only saves, it does not restore:
+        if !window.setFrameUsingName(Self.frameName) {
+            window.center()
+        }
 
         super.init(window: window)
 
@@ -119,16 +125,26 @@ final class MainWindowController: NSWindowController, NSOutlineViewDataSource,
     /// Reload the streams tree and the transport controls.
     func refresh() {
         switch reload() {
-        case .success(let root):
-            self.root = root
+        case .success(let loaded):
             loadError = nil
+
+            // reloading throws the selection away, so only do it when the
+            // streams file actually changed:
+            if loaded !== root {
+                root = loaded
+                outlineView.reloadData()
+                outlineView.expandItem(nil, expandChildren: true)
+            }
+
         case .failure(let error):
-            root = StreamNode(group: "")
             loadError = error.localizedDescription
+
+            if !root.children.isEmpty {
+                root = StreamNode(group: "")
+                outlineView.reloadData()
+            }
         }
 
-        outlineView.reloadData()
-        outlineView.expandItem(nil, expandChildren: true)
         refreshControls()
     }
 
@@ -147,10 +163,24 @@ final class MainWindowController: NSWindowController, NSOutlineViewDataSource,
         playButton.isEnabled = player.source != nil
         muteButton.isEnabled = !player.isIdle
 
+        // the volume can also be changed from the menu bar:
+        let volume = player.volume * 100
+        if abs(volumeSlider.doubleValue - volume) > 0.5 {
+            volumeSlider.doubleValue = volume
+        }
+
         if let error = loadError {
             statusLabel.stringValue = error
         } else if let source = player.source {
-            let state = player.isIdle ? "Idle" : (player.isMuted ? "Playing (muted)" : "Playing")
+            let state: String
+            if player.isIdle {
+                state = "Idle"
+            } else if player.isBuffering {
+                state = "Buffering"
+            } else {
+                state = player.isMuted ? "Playing (muted)" : "Playing"
+            }
+
             statusLabel.stringValue = "\(state) - \(source.name)"
         } else {
             statusLabel.stringValue = "No stream selected"

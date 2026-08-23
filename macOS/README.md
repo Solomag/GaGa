@@ -35,6 +35,20 @@ or select one and use the transport controls at the bottom (play/stop,
 mute, volume). Closing the window leaves the app in the menu bar; clicking
 the dock icon brings it back.
 
+**Power**: closing the lid stops playback and opening it starts the same
+station again, whether or not the machine actually slept in between — a
+closed lid on power, or with an external display, keeps running otherwise.
+The same happens across sleep and wake: a live stream cannot be paused and
+picked up later, so it is reopened rather than resumed. Stopping playback
+yourself before closing the lid is remembered; it will not start itself
+again when you open it.
+
+Playing does **not** keep the machine awake. CoreAudio normally holds a
+`PreventUserIdleSystemSleep` assertion for any process with audio running,
+which a radio player has no business doing, so the app opts out with
+`kAudioHardwarePropertySleepingIsAllowed`. Idle sleep works exactly as it
+would with nothing playing.
+
 **Media keys** work through the system Now Playing controls, so play/pause
 on the keyboard and in Control Center reach the app. No accessibility
 permission is needed. Toggle them in the Options submenu.

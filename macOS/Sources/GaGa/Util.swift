@@ -25,6 +25,21 @@ enum AppPaths {
         .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/capris.m3u")
 }
 
+extension String {
+
+    /// Text read from a streams file or a playlist: UTF-8 when possible,
+    /// Latin-1 as a fallback so that a bad encoding is not fatal, and never
+    /// with a byte order mark left at the front. Editors on Windows write
+    /// one routinely, and it would otherwise end up glued to the first line.
+    init(textData data: Data) {
+        let text = String(data: data, encoding: .utf8)
+            ?? String(data: data, encoding: .isoLatin1)
+            ?? ""
+
+        self = text.hasPrefix("\u{FEFF}") ? String(text.dropFirst()) : text
+    }
+}
+
 /// Modal messages. This is an accessory app with no windows of its own,
 /// so it must come to the front before showing one.
 enum Alert {

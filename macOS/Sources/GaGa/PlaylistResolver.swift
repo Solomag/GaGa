@@ -51,7 +51,7 @@ enum PlaylistResolver {
 
         if url.isFileURL {
             do {
-                let text = try readText(Data(contentsOf: url))
+                let text = String(textData: try Data(contentsOf: url))
                 guard let next = firstURL(in: text, base: url) else {
                     DispatchQueue.main.async { completion(.failure(ResolveError.empty(url))) }
                     return
@@ -73,7 +73,7 @@ enum PlaylistResolver {
 
             guard
                 let data,
-                let next = firstURL(in: readText(data), base: base)
+                let next = firstURL(in: String(textData: data), base: base)
             else {
                 DispatchQueue.main.async { completion(.failure(ResolveError.empty(url))) }
                 return
@@ -83,10 +83,6 @@ enum PlaylistResolver {
         }
 
         task.resume()
-    }
-
-    private static func readText(_ data: Data) -> String {
-        String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
     }
 
     /// Extract the first stream URL from playlist text. The format is

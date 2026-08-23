@@ -26,6 +26,9 @@ final class Player: NSObject {
     /// player event belonging to a previous stream is ignored.
     private var generation = 0
 
+    /// True when the machine, not the user, stopped playback.
+    private var isSuspended = false
+
     private var timeControlObservation: NSKeyValueObservation?
     private var itemStatusObservation: NSKeyValueObservation?
 
@@ -38,6 +41,10 @@ final class Player: NSObject {
     }
 
     var isMuted: Bool { player.isMuted }
+
+    /// True while the stream is opening or has stalled, as opposed to
+    /// actually feeding audio out.
+    var isBuffering: Bool { !isIdle && player.timeControlStatus != .playing }
 
     /// Called whenever the state changes, so that the window can follow.
     var onStateChanged: (() -> Void)?
@@ -127,8 +134,17 @@ final class Player: NSObject {
     func play() {
         guard let source else { return }
 
+        // playing again by hand cancels any pending automatic resume:
+        isSuspended = false
         generation += 1
         let token = generation
+
+        // silence whatever is playing right now: resolving a playlist takes
+        // a round trip, and until it lands nothing of the previous station
+        // should still be heard under the new one's name.
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        itemStatusObservation = nil
 
         isIdle = false
         player.isMuted = false
@@ -183,6 +199,22 @@ final class Player: NSObject {
 
     func togglePlay() {
         isIdle ? play() : stop()
+    }
+
+    /// Stop because the machine is going away: sleeping, or the lid closing.
+    /// A live stream cannot be paused and picked up later, so this stops it
+    /// and remembers to open it again.
+    func suspend() {
+        guard !isIdle else { return }
+
+        stop()
+        isSuspended = true
+    }
+
+    /// Start again, but only if we were the ones who stopped.
+    func resume() {
+        guard isSuspended else { return }
+        play()
     }
 
     func mute() {
@@ -269,6 +301,7 @@ final class Player: NSObject {
         switch status {
         case .waitingToPlayAtSpecifiedRate:
             startBufferingAnimation()
+            updateIcon()
         case .playing:
             stopBufferingAnimation()
             updateIcon()
