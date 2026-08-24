@@ -27,7 +27,11 @@ final class Player: NSObject {
     private var generation = 0
 
     /// True when the machine, not the user, stopped playback.
-    private var isSuspended = false
+    private(set) var isSuspended = false
+
+    /// Whether a lid or sleep change would have anything to act on: either
+    /// something is playing, or something is waiting to be started again.
+    var needsPowerWatch: Bool { !isIdle || isSuspended }
 
     private var timeControlObservation: NSKeyValueObservation?
     private var itemStatusObservation: NSKeyValueObservation?
@@ -36,7 +40,7 @@ final class Player: NSObject {
     private var currentBufferingIcon = 0
 
     /// Player volume, between 0 and 1.
-    var volume: Double = 0.5 {
+    var volume: Double = 0.3 {
         didSet { player.volume = Float(min(max(volume, 0), 1)) }
     }
 
@@ -207,8 +211,10 @@ final class Player: NSObject {
     func suspend() {
         guard !isIdle else { return }
 
-        stop()
+        // before stopping, so that the state change is reported with the
+        // suspension already in effect:
         isSuspended = true
+        stop()
     }
 
     /// Start again, but only if we were the ones who stopped.

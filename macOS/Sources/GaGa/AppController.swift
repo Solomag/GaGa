@@ -64,7 +64,12 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         windowController = window
-        player.onStateChanged = { [weak window] in window?.refreshControls() }
+
+        player.onStateChanged = { [weak self] in
+            self?.windowController?.refreshControls()
+            self?.power.setMonitoring(self?.player.needsPowerWatch ?? false)
+        }
+
         window.show()
 
         // stop for a closing lid or a sleeping machine, and come back after:
@@ -75,6 +80,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if settings.autoPlay {
             player.play()
         }
+
+        power.setMonitoring(player.needsPowerWatch)
     }
 
     /// Closing the window leaves the app in the menu bar.

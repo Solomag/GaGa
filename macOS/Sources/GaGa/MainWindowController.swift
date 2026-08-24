@@ -267,6 +267,7 @@ final class MainWindowController: NSWindowController, NSOutlineViewDataSource,
     @objc private func onPlayClicked() {
         // play what is selected, if anything, otherwise the current stream:
         if player.isIdle,
+           outlineView.selectedRow >= 0,
            let node = outlineView.item(atRow: outlineView.selectedRow) as? StreamNode,
            let stream = node.stream {
             player.play(stream)

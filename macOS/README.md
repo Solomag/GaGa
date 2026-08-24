@@ -91,7 +91,13 @@ iCloud Drive changes what plays. Every other station in the file is
 available from the same list.
 
 Settings live next to the streams file in `Settings.json`: volume, last
-stream, and the two options (play on startup, media keys).
+stream, and the two options (play on startup, media keys). A fresh install
+starts at 30% volume with Capris selected and auto play off, so opening the
+app and clicking play is all it takes.
+
+The application icon is generated rather than checked in by hand. To change
+it, edit `Icon/make-icon.swift` and run `swift Icon/make-icon.swift`, which
+rewrites `Icon/AppIcon.icns`; `build.sh` copies that into the bundle.
 
 ## Differences from the Windows version
 

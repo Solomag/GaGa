@@ -26,6 +26,7 @@ final class PowerWatcher {
     private var notificationPort: IONotificationPortRef?
     private var notification: io_object_t = IO_OBJECT_NULL
     private var lidIsClosed = false
+    private var lidTimer: Timer?
 
     /// False when the lid watch could not be armed, in which case the
     /// display notifications above are the only trigger.
@@ -41,7 +42,31 @@ final class PowerWatcher {
         watchLid()
     }
 
+    /// Watch the lid only while there is something to act on. The IOKit
+    /// message below is the fast path, but whether it arrives for a clamshell
+    /// change is not something we can count on, so the state is also sampled
+    /// while playing. Reading it is a register lookup, and the tolerance lets
+    /// the system coalesce the wakeups.
+    func setMonitoring(_ monitoring: Bool) {
+        guard monitoring != (lidTimer != nil) else { return }
+
+        guard monitoring else {
+            lidTimer?.invalidate()
+            lidTimer = nil
+            return
+        }
+
+        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
+            self?.checkLid()
+        }
+
+        timer.tolerance = 1
+        RunLoop.main.add(timer, forMode: .common)
+        lidTimer = timer
+    }
+
     func stop() {
+        setMonitoring(false)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
 
         if notification != IO_OBJECT_NULL {
@@ -212,7 +237,13 @@ final class PowerWatcher {
 
     private func resumeSoon() {
         DispatchQueue.main.asyncAfter(deadline: .now() + resumeDelay) { [weak self] in
-            self?.onResume?()
+            guard let self else { return }
+
+            // the lid can close again inside the delay, and coming back
+            // then would start the radio into a shut laptop:
+            guard !self.readLidIsClosed() else { return }
+
+            self.onResume?()
         }
     }
 }

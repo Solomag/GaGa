@@ -8,7 +8,7 @@ import Foundation
 struct Settings: Codable {
 
     /// Last volume set in the audio menu, between 0 and 1.
-    var volume: Double = 0.5
+    var volume: Double = 0.3
 
     /// Last stream played. Defaults to the local playlist, so that a
     /// fresh install plays it without picking anything first.
