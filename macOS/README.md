@@ -11,10 +11,19 @@ edit, move and share, instead of being added one by one through a GUI.
 ```
 ./build.sh            # builds macOS/build/GaGa.app
 ./build.sh --install  # ... and copies it to /Applications
+./package.sh          # ... and wraps it as a .dmg and a .zip
 ```
 
 Needs Xcode command line tools. No other dependencies. The result is a
 universal (Apple silicon + Intel) app bundle.
+
+The app is signed ad-hoc rather than with a Developer ID, and is not
+notarized. On your own machine that is invisible: a locally built app
+carries no quarantine flag and opens normally. Anything that arrives over
+the internet does carry one, and Gatekeeper refuses an ad-hoc signature, so
+whoever receives it has to right click the app and choose Open the first
+time, or run `xattr -dr com.apple.quarantine /Applications/GaGa.app`.
+Avoiding that step needs a paid Developer ID and notarization.
 
 ## How it works
 
