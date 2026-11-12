@@ -13,6 +13,7 @@ using System.Windows.Forms;
 
 using GaGa.Controls;
 using GaGa.NotifyIconPlayer;
+using GaGa.Search;
 using GaGa.StreamsFile;
 
 using LowKey;
@@ -45,7 +46,11 @@ namespace GaGa
         private readonly ToolStripMenuItem errorOpenItem;
         private readonly ToolStripMenuItem errorReadItem;
         private readonly ToolStripMenuItem editItem;
+        private readonly ToolStripMenuItem searchItem;
         private readonly ToolStripMenuItem exitItem;
+
+        // station search window, while open:
+        private SearchDialog searchDialog;
 
         // audio submenu:
         private readonly ToolStripMenuItem audioMenuItem;
@@ -109,6 +114,9 @@ namespace GaGa
 
             editItem = new ToolStripMenuItem();
             editItem.Text = "&Edit streams file";
+
+            searchItem = new ToolStripMenuItem();
+            searchItem.Text = "&Search stations...";
 
             exitItem = new ToolStripMenuItem();
             exitItem.Text = "E&xit";
@@ -184,6 +192,7 @@ namespace GaGa
             errorOpenItem.Click += OnErrorOpenItemClick;
             errorReadItem.Click += OnErrorReadItemClick;
             editItem.Click += OnEditItemClick;
+            searchItem.Click += OnSearchItemClick;
             exitItem.Click += OnExitItemClick;
             nowPlayingItem.Click += OnNowPlayingItemClick;
             player.TitleChanged += OnPlayerTitleChanged;
@@ -378,10 +387,63 @@ namespace GaGa
             }
 
             menu.Items.Add(editItem);
+            menu.Items.Add(searchItem);
             menu.Items.Add("-");
             menu.Items.Add(audioMenuItem);
             menu.Items.Add(optionsMenuItem);
             menu.Items.Add(exitItem);
+        }
+
+        /// <summary>
+        /// Put a checkmark on the current stream, and on the submenus
+        /// that lead to it, so it's easy to see what's selected.
+        /// </summary>
+        private void MenuMarkCurrentStream()
+        {
+            PlayerStream current = player.Source;
+            Boolean found = false;
+
+            foreach (ToolStripItem item in notifyIcon.ContextMenuStrip.Items)
+            {
+                if (item == dynamicMenuMarker)
+                    break;
+
+                ToolStripMenuItem menuItem = item as ToolStripMenuItem;
+                if (menuItem != null && menuItem != nowPlayingItem && MenuMarkCurrentStream(menuItem, current, found))
+                    found = true;
+            }
+        }
+
+        /// <summary>
+        /// Mark an item (recursively) when it is, or contains, the current stream.
+        /// Only the first match is marked when a stream is listed more than once.
+        /// Returns whether the item was marked.
+        /// </summary>
+        private Boolean MenuMarkCurrentStream(ToolStripMenuItem item, PlayerStream current, Boolean alreadyFound)
+        {
+            Boolean marked = false;
+
+            if (item.DropDownItems.Count > 0)
+            {
+                foreach (ToolStripItem child in item.DropDownItems)
+                {
+                    ToolStripMenuItem childItem = child as ToolStripMenuItem;
+                    if (childItem != null && MenuMarkCurrentStream(childItem, current, alreadyFound || marked))
+                        marked = true;
+                }
+            }
+            else
+            {
+                Uri uri = item.Tag as Uri;
+                marked = !alreadyFound
+                      && current != null
+                      && uri != null
+                      && uri == current.Uri
+                      && item.Text == current.Name;
+            }
+
+            item.Checked = marked;
+            return marked;
         }
 
         /// <summary>
@@ -403,6 +465,7 @@ namespace GaGa
             }
 
             toolStripRenderer.UpdateColors();
+            MenuMarkCurrentStream();
 
             notifyIcon.ContextMenuStrip.ResumeLayout();
             e.Cancel = false;
@@ -702,6 +765,26 @@ namespace GaGa
         private void OnEditItemClick(Object sender, EventArgs e)
         {
             StreamsFileOpen();
+        }
+
+        /// <summary>
+        /// Search clicked, open the station search window
+        /// (or bring it to the front when it's already open).
+        /// </summary>
+        private void OnSearchItemClick(Object sender, EventArgs e)
+        {
+            if (searchDialog == null || searchDialog.IsDisposed)
+            {
+                searchDialog = new SearchDialog(streamsFilepath);
+                searchDialog.PlayRequested += (name, uri) => player.Play(new PlayerStream(name, uri));
+                searchDialog.FormClosed += (s, args) => searchDialog = null;
+                searchDialog.Show();
+            }
+
+            if (searchDialog.WindowState == FormWindowState.Minimized)
+                searchDialog.WindowState = FormWindowState.Normal;
+
+            searchDialog.Activate();
         }
 
         /// <summary>

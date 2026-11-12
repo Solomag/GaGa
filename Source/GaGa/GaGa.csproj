@@ -46,6 +46,7 @@
     <Reference Include="PresentationCore" />
     <Reference Include="System" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="WindowsBase" />
   </ItemGroup>
@@ -61,9 +62,12 @@
     <Compile Include="NotifyIconPlayer\Player.cs" />
     <Compile Include="NotifyIconPlayer\PlayerStream.cs" />
     <Compile Include="NotifyIconPlayer\Util.cs" />
+    <Compile Include="Search\RadioBrowser.cs" />
+    <Compile Include="Search\SearchDialog.cs" />
     <Compile Include="StreamsFile\StreamsFileLoader.cs" />
     <Compile Include="StreamsFile\StreamsFileReader.cs" />
     <Compile Include="StreamsFile\StreamsFileReadError.cs" />
+    <Compile Include="StreamsFile\StreamsFileWriter.cs" />
     <Compile Include="StreamsFile\Util.cs" />
     <Compile Include="GaGa.cs" />
     <Compile Include="GaGaSettings.cs" />
