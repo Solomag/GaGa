@@ -1,4 +1,32 @@
 
+# GaGa
+
+GaGa is a tiny radio player for the Windows tray. This repository is the
+**maintained continuation** of [Beluki/GaGa][Original]. Beluki, who wrote GaGa,
+passed away in 2016. GaGa is still a single small `GaGa.exe` that needs
+nothing but Windows; this fork keeps it working with today's internet radio.
+
+**[Download the latest GaGa.exe][Releases]**
+
+### New since the original 2016.02.02 release
+
+* **https:// stations play.** Many stations moved to https, which the original could not open.
+* **Lossless FLAC streams** (Ogg FLAC) play, with no gap at track changes.
+* **Current track title** shown in three places:
+    * on top of the menu (click to copy);
+    * on the tray tooltip;
+    * in a small notification when the track changes.
+
+  It works for any Icecast/SHOUTcast station, http or https.
+* **Station search.** *Search stations...* finds stations in the
+  [radio-browser.info][] directory (by name, genre or country). You can listen
+  right away or add a station to your streams file in one click.
+* **A checkmark on the station you're listening to**, and on the submenus that lead to it.
+* **Working default stations** (SomaFM, Radio Paradise, Radio Swiss, KEXP...).
+  The original ones were hosted on Radionomy, which shut down in 2020.
+
+Existing `Streams.ini` and settings files keep working: just replace `GaGa.exe`.
+
 ## About
 
 GaGa is a very lightweight, simple online radio player that runs as an icon
@@ -65,9 +93,10 @@ milliseconds, even with hundreds of radio stations defined.
 
 ## Compiling and installation
 
-Building GaGa is a matter of opening the included Visual Studio 2010
-solution and clicking the build button (or using msbuild). The source code
-has no dependencies other than the [.NET Framework][] 4.0+.
+Run `build.cmd`: it compiles `Build\GaGa.exe` with the C# compiler that
+ships with the [.NET Framework][] 4, so no Visual Studio is needed. The
+included Visual Studio solution works too. The source code has no
+dependencies other than the .NET Framework 4.0+.
 
 There are binaries for the latest version in the [Releases][] tab above.
 
@@ -77,16 +106,18 @@ provided the .NET Framework is available on the target machine.
 
 ## Where to find radio stations
 
-GaGa only includes the Jamendo radio stations in the default ini. Here are
-some places with tons of radio stations, classified by genre or by country:
+Use *Search stations...* in the menu: it searches the [radio-browser.info][]
+directory, which lists tens of thousands of stations. Other places with lots of
+stations, classified by genre or by country:
 
-* [Listen Live](http://www.listenlive.eu)
-* [Radionomy](http://www.radionomy.com/en)
-* [The Icecast Directory](http://dir.xiph.org)
+* [radio-browser.info][]
+* [The Icecast Directory](https://dir.xiph.org)
+* [Listen Live](https://www.listenlive.eu)
 
 ## Portability
 
-GaGa is tested on Windows 7 and 8, using the .NET Framework 4.0+. [Mono][]
+GaGa was originally tested on Windows 7 and 8. The current version is tested
+on Windows 10, and the .NET Framework 4 it needs is part of Windows 10 and 11. [Mono][]
 is not supported, because it doesn't implement MediaPlayer (in PresentationCore)
 which GaGa uses for playback.
 
@@ -96,18 +127,21 @@ will work, although I suggest something better such as [Notepad2][] or
 
 ## Status
 
-This program is finished!
+Maintained. Bug reports and requests are welcome in the [issues][Issues].
 
-GaGa is feature-complete and has no known bugs. Unless issues are reported
-I plan no further development on it other than maintenance.
+GaGa stays what Beluki made it: one small executable, no installer, no
+dependencies, and a plain text file for your stations.
 
 ## License
 
-Like all my hobby projects, this is Free Software. See the [Documentation][]
-folder for more information. No warranty though.
+Free Software, as Beluki released it: do whatever you want with it. See the
+[Documentation][] folder for more information. No warranty though.
 
 [Documentation]: Documentation
-[Releases]: https://github.com/Beluki/GaGa/releases
+[Releases]: https://github.com/Solomag/GaGa/releases/latest
+[Issues]: https://github.com/Solomag/GaGa/issues
+[Original]: https://github.com/Beluki/GaGa
+[radio-browser.info]: https://www.radio-browser.info
 
 [Mono]: http://mono-project.com
 [.NET Framework]: http://www.microsoft.com/en-us/download/details.aspx?id=30653

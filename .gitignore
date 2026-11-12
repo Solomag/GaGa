@@ -1,4 +1,5 @@
 Source/GaGa/bin
 Source/GaGa/obj
 Source/*.suo
-
+Build/
+Build-new/
