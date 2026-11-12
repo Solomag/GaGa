@@ -1,6 +1,6 @@
 # GaGa for macOS
 
-A port of [GaGa](https://github.com/thekingziga/GaGa) — a very lightweight
+A port of [GaGa](https://github.com/Solomag/GaGa) by [thekingziga](https://github.com/thekingziga/GaGa) — a very lightweight
 radio player that lives in the menu bar — to macOS, in Swift and AppKit.
 
 Like the Windows original, stations come from a plain INI file that you can

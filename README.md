@@ -8,6 +8,10 @@ nothing but Windows; this fork keeps it working with today's internet radio.
 
 **[Download the latest GaGa.exe][Releases]**
 
+There is also a **[macOS version](macOS)**, a menu bar app in Swift by
+[thekingziga](https://github.com/thekingziga/GaGa). It uses the same
+`Streams.ini` format.
+
 ### New since the original 2016.02.02 release
 
 * **https:// stations play.** Many stations moved to https, which the original could not open.

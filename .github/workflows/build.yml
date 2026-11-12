@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,5 +18,22 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: GaGa
+          name: GaGa-Windows
           path: Build/GaGa.exe
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # universal (Apple silicon + Intel) app, packaged as .dmg and .zip:
+      - name: Build GaGa.app
+        working-directory: macOS
+        run: ./package.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GaGa-macOS
+          path: |
+            macOS/build/*.dmg
+            macOS/build/*.zip
