@@ -274,6 +274,19 @@ namespace GaGa.NotifyIconPlayer
         private UInt64 nextFrame;     // fixed-blocksize streams: frame number
         private UInt64 nextSample;    // variable-blocksize streams: first sample number
 
+        /// <summary>
+        /// After a reconnection the player is already past some frames:
+        /// numbering goes on from where the previous connection stopped.
+        /// </summary>
+        public void ContinueNumberingFrom(OggFlacRemuxer previous)
+        {
+            if (previous == null)
+                return;
+
+            nextFrame = previous.nextFrame;
+            nextSample = previous.nextSample;
+        }
+
         private static Int32 BlockSize(Int32 code, Byte[] p, Int32 extraAt)
         {
             if (code == 1) return 192;

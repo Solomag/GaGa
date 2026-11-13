@@ -516,6 +516,9 @@ namespace GaGa.NotifyIconPlayer
             Int32 failedOpens = 0;
             Queue<DateTime> drops = new Queue<DateTime>();
 
+            // FLAC frame numbers must keep growing across reconnections:
+            OggFlacRemuxer lastRemuxer = null;
+
             try
             {
                 client.NoDelay = true;
@@ -578,6 +581,8 @@ namespace GaGa.NotifyIconPlayer
                         if (isOgg)
                         {
                             remuxer = new OggFlacRemuxer(audio);
+                            remuxer.ContinueNumberingFrom(lastRemuxer);
+                            lastRemuxer = remuxer;
                             isFlac = remuxer.Start();
                         }
 
