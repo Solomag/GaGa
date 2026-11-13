@@ -518,6 +518,7 @@ namespace GaGa.NotifyIconPlayer
 
             // FLAC frame numbers must keep growing across reconnections:
             OggFlacRemuxer lastRemuxer = null;
+            Boolean flacHeaderSent = false;
 
             try
             {
@@ -609,7 +610,10 @@ namespace GaGa.NotifyIconPlayer
                         if (isFlac)
                         {
                             // the header goes out once, the player is already past it:
-                            remuxer.CopyFlacTo(output, () => stopped, ReportTitle, before == 0);
+                            // (player.Written also counts the HTTP answer, so it can't tell)
+                            Boolean writeHeader = !flacHeaderSent;
+                            flacHeaderSent = true;
+                            remuxer.CopyFlacTo(output, () => stopped, ReportTitle, writeHeader);
                         }
                         else if (isOgg)
                         {
