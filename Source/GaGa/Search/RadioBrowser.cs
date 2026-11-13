@@ -199,8 +199,8 @@ namespace GaGa.Search
         }
 
         /// <summary>
-        /// Search the directory. Most popular stations first, broken ones
-        /// and HLS-only ones (which Windows MediaPlayer can't play) left out.
+        /// Search the directory. Most popular stations first, broken ones left out.
+        /// HLS stations are kept: the relay turns them into a plain stream.
         /// Blocking: call from a background thread.
         /// </summary>
         public static List<RadioStation> Search(RadioSearchField field, String term)
@@ -233,7 +233,7 @@ namespace GaGa.Search
                     List<RadioStation> playable = new List<RadioStation>();
                     foreach (RadioStation station in stations)
                     {
-                        if (station.Hls == 0 && station.StreamUri != null && !String.IsNullOrEmpty(station.Name) && IsPlayableCodec(station.Codec))
+                        if (station.StreamUri != null && !String.IsNullOrEmpty(station.Name) && IsPlayableCodec(station.Codec))
                         {
                             station.Name = station.Name.Trim();
                             playable.Add(station);

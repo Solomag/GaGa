@@ -169,7 +169,10 @@ namespace GaGa
             volumeTrackBar = new ToolStripLabeledTrackBar();
             volumeTrackBar.Label.Text = "Volume";
             volumeTrackBar.TrackBar.Minimum = 0;
-            volumeTrackBar.TrackBar.Maximum = 20;
+            volumeTrackBar.TrackBar.Maximum = 100;
+            volumeTrackBar.TrackBar.SmallChange = 2;
+            volumeTrackBar.TrackBar.LargeChange = 10;
+            volumeTrackBar.TrackBar.TickFrequency = 10;
 
             // adjust the backcolor to the renderer:
             Color back = toolStripRenderer.ColorTable.ToolStripDropDownBackground;
@@ -227,7 +230,7 @@ namespace GaGa
 
             // apply settings before wiring events:
             balanceTrackBar.TrackBar.Value = settings.LastBalanceTrackBarValue;
-            volumeTrackBar.TrackBar.Value = settings.LastVolumeTrackBarValue;
+            volumeTrackBar.TrackBar.Value = Math.Max(0, Math.Min(100, settings.VolumePercent));
 
             BalanceUpdate();
             VolumeUpdate();
@@ -910,7 +913,8 @@ namespace GaGa
             player.Stop();
 
             settings.LastBalanceTrackBarValue = balanceTrackBar.TrackBar.Value;
-            settings.LastVolumeTrackBarValue = volumeTrackBar.TrackBar.Value;
+            settings.LastVolumePercent = volumeTrackBar.TrackBar.Value;
+            settings.LastVolumeTrackBarValue = (volumeTrackBar.TrackBar.Value + 2) / 5;
             settings.LastPlayerStream = player.Source;
             settings.OptionsEnableAutoPlayChecked = optionsEnableAutoPlayItem.Checked;
             settings.OptionsEnableMultimediaKeysChecked = optionsEnableMultimediaKeysItem.Checked;

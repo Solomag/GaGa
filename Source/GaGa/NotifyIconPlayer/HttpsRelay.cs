@@ -375,9 +375,10 @@ namespace GaGa.NotifyIconPlayer
 
         /// <summary>
         /// Open the stream, following playlists to the actual audio stream.
+        /// HLS playlists are turned into a continuous stream (see HlsStream).
         /// Returns the playlist itself when it can't be followed (the player may still manage).
         /// </summary>
-        private static Remote OpenFollowingPlaylists(Uri uri)
+        private Remote OpenFollowingPlaylists(Uri uri)
         {
             for (Int32 depth = 0; ; depth++)
             {
@@ -392,7 +393,22 @@ namespace GaGa.NotifyIconPlayer
                 while (body.Length < 65536 && (read = remote.Body.Read(buffer, 0, buffer.Length)) > 0)
                     body.Write(buffer, 0, read);
 
-                Uri entry = FirstPlaylistEntry(Encoding.UTF8.GetString(body.ToArray()), uri);
+                String text = Encoding.UTF8.GetString(body.ToArray());
+
+                if (HlsStream.IsHls(text))
+                {
+                    remote.Dispose();
+
+                    HlsStream hls = new HlsStream(uri, ReportTitle, () => stopped);
+                    hls.Start(text);
+
+                    Remote live = new Remote();
+                    live.Body = hls;
+                    live.ContentType = hls.ContentType ?? "audio/aac";
+                    return live;
+                }
+
+                Uri entry = FirstPlaylistEntry(text, uri);
                 if (entry == null)
                 {
                     // give the player the playlist as it was:

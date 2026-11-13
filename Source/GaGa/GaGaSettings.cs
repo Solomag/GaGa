@@ -21,9 +21,17 @@ namespace GaGa
         public Int32 LastBalanceTrackBarValue;
 
         /// <summary>
-        /// Last volume value set in the audio menu.
+        /// Last volume value set in the audio menu, on the old 0-20 scale.
+        /// Kept so that older GaGa versions can still read the file.
         /// </summary>
         public Int32 LastVolumeTrackBarValue;
+
+        /// <summary>
+        /// Last volume set in the audio menu, 0-100.
+        /// Optional: -1 when the file comes from an older version.
+        /// </summary>
+        [OptionalField]
+        public Int32 LastVolumePercent;
 
         /// <summary>
         /// Last stream played.
@@ -61,11 +69,20 @@ namespace GaGa
         {
             LastBalanceTrackBarValue = 0;
             LastVolumeTrackBarValue = 10;
+            LastVolumePercent = 50;
             LastPlayerStream = null;
             OptionsEnableAutoPlayChecked = false;
             OptionsEnableMultimediaKeysChecked = true;
             OptionsEnableTrackNotificationsChecked = true;
             OptionsCheckForUpdatesChecked = true;
+        }
+
+        /// <summary>
+        /// Volume, 0-100, from whichever field the file has.
+        /// </summary>
+        public Int32 VolumePercent
+        {
+            get { return (LastVolumePercent >= 0) ? LastVolumePercent : LastVolumeTrackBarValue * 5; }
         }
 
         /// <summary>
@@ -76,6 +93,7 @@ namespace GaGa
         {
             OptionsEnableTrackNotificationsChecked = true;
             OptionsCheckForUpdatesChecked = true;
+            LastVolumePercent = -1;
         }
     }
 }

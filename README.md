@@ -24,6 +24,8 @@ Issues and suggestions: https://github.com/Solomag/GaGa/issues
 
 * **https:// stations play.** Many stations moved to https, which the original could not open.
 * **Lossless FLAC streams** (Ogg FLAC) play, with no gap at track changes.
+* **HLS stations** (`.m3u8`, e.g. many Serbian and Russian stations) play too,
+  with track titles, and show up in the station search.
 * **Current track title** shown in three places:
     * on top of the menu (click to copy);
     * on the tray tooltip;
@@ -60,6 +62,8 @@ reflects the current state (e.g. an animation while buffering).
 
 GaGa also implements global hotkeys using multimedia keys. Toggle them on
 or off in the options submenu if your keyboard has them.
+
+The volume moves in steps of 2% (the original had 5%).
 
 On a modern system, GaGa typically uses about 16 MB of ram and 1% CPU while
 playing. It supports .m3u, .asx, .mp3 and basically everything that Windows
