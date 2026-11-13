@@ -251,6 +251,7 @@ namespace GaGa
             optionsEnableMultimediaKeysItem.Checked = settings.OptionsEnableMultimediaKeysChecked;
             optionsEnableTrackNotificationsItem.Checked = settings.OptionsEnableTrackNotificationsChecked;
             optionsCheckUpdatesItem.Checked = settings.OptionsCheckForUpdatesChecked;
+            ExtrasInit();
             Theme.Mode = (ThemeMode) Math.Max(0, Math.Min(2, settings.OptionsTheme));
             ThemeUpdate();
 
@@ -478,7 +479,10 @@ namespace GaGa
             menu.Items.Add(searchItem);
             menu.Items.Add(favoriteItem);
             menu.Items.Add("-");
+            menu.Items.Add(recentMenuItem);
+            menu.Items.Add(historyMenuItem);
             menu.Items.Add(recordMenuItem);
+            menu.Items.Add(sleepMenuItem);
             menu.Items.Add(audioMenuItem);
             menu.Items.Add(optionsMenuItem);
             menu.Items.Add(exitItem);
@@ -556,6 +560,7 @@ namespace GaGa
             ThemeUpdate();
             MenuMarkCurrentStream();
             MenuUpdateStates();
+            ExtrasMenuUpdate();
 
             notifyIcon.ContextMenuStrip.ResumeLayout();
             e.Cancel = false;
@@ -586,6 +591,8 @@ namespace GaGa
             nowPlayingItem.Text = text.Replace("&", "&&");
             nowPlayingItem.Available = true;
             nowPlayingSeparator.Available = true;
+
+            HistoryAdd(title, player.Source);
 
             if (optionsEnableTrackNotificationsItem.Checked && player.Source != null)
             {
@@ -807,6 +814,7 @@ namespace GaGa
             ToolStripMenuItem item = (ToolStripMenuItem) sender;
             PlayerStream stream = new PlayerStream(item.Text, (Uri) item.Tag);
 
+            RecentAdd(stream);
             player.Play(stream);
         }
 
@@ -866,7 +874,12 @@ namespace GaGa
             if (searchDialog == null || searchDialog.IsDisposed)
             {
                 searchDialog = new SearchDialog(streamsFilepath);
-                searchDialog.PlayRequested += (name, uri) => player.Play(new PlayerStream(name, uri));
+                searchDialog.PlayRequested += (name, uri) =>
+                {
+                    PlayerStream found = new PlayerStream(name, uri);
+                    RecentAdd(found);
+                    player.Play(found);
+                };
                 searchDialog.FormClosed += (s, args) => searchDialog = null;
                 Theme.Apply(searchDialog);
                 searchDialog.HandleCreated += (s, args) => Theme.ApplyTitleBar((Form) s);
@@ -934,6 +947,7 @@ namespace GaGa
             settings.OptionsEnableTrackNotificationsChecked = optionsEnableTrackNotificationsItem.Checked;
             settings.OptionsCheckForUpdatesChecked = optionsCheckUpdatesItem.Checked;
             settings.OptionsTheme = (Int32) Theme.Mode;
+            ExtrasSave();
             SettingsSave();
 
             // unhook, but don't be annoying with error messages on shutdown:

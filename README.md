@@ -42,6 +42,12 @@ Issues and suggestions: https://github.com/Solomag/GaGa/issues
 * **Recording.** *Recording > Record this station* saves the stream as it
   plays (MP3, AAC or FLAC, no re-encoding) into a `Recordings` folder next to `GaGa.exe`.
 * **Start with Windows** (in *Options*), off by default.
+* **Recent stations**: the last 15 you played, one click away.
+* **Track history**: the last 100 tracks with time and station; copy one or
+  search for it on the web.
+* **Sleep timer**: stop playing after 15, 30, 60 or 120 minutes.
+* **Reconnects by itself** when a station drops the connection, and gives up
+  quickly (with the reason) on stations that are gone or send nothing.
 * **Dark theme** for the menu and the search window: follows Windows, or
   pick *Options > Theme > Light / Dark*.
 * **Updates.** GaGa checks for a new release on startup (can be turned off in

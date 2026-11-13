@@ -427,98 +427,247 @@ namespace GaGa.NotifyIconPlayer
         /// Serving
         ///
 
+        private const Int32 MaxOpenAttempts = 12;
+        private const Int32 MaxSilentAttempts = 3;
+        private const Int32 MaxDropsPerMinute = 5;
+
+        /// <summary>
+        /// Write-only stream to the player that remembers when writing failed:
+        /// that means the player went away (stop, switch), not the station.
+        /// </summary>
+        private class PlayerConnection : Stream
+        {
+            private readonly Stream inner;
+            public Boolean Failed;
+            public Int64 Written;
+
+            public PlayerConnection(Stream inner)
+            {
+                this.inner = inner;
+            }
+
+            public override void Write(Byte[] buffer, Int32 offset, Int32 count)
+            {
+                try
+                {
+                    inner.Write(buffer, offset, count);
+                    Written += count;
+                }
+                catch
+                {
+                    Failed = true;
+                    throw;
+                }
+            }
+
+            public override Boolean CanRead { get { return false; } }
+            public override Boolean CanSeek { get { return false; } }
+            public override Boolean CanWrite { get { return true; } }
+            public override Int64 Length { get { throw new NotSupportedException(); } }
+            public override Int64 Position
+            {
+                get { throw new NotSupportedException(); }
+                set { throw new NotSupportedException(); }
+            }
+            public override void Flush() { inner.Flush(); }
+            public override Int32 Read(Byte[] buffer, Int32 offset, Int32 count) { throw new NotSupportedException(); }
+            public override Int64 Seek(Int64 offset, SeekOrigin origin) { throw new NotSupportedException(); }
+            public override void SetLength(Int64 value) { throw new NotSupportedException(); }
+        }
+
+        /// <summary>
+        /// Errors that won't go away by asking again.
+        /// </summary>
+        private static Boolean IsFinal(Exception e)
+        {
+            WebException web = e as WebException;
+            HttpWebResponse response = (web != null) ? (web.Response as HttpWebResponse) : null;
+            if (response == null)
+                return false;
+
+            Int32 code = (Int32) response.StatusCode;
+            return code == 401 || code == 403 || code == 404 || code == 410;
+        }
+
+        private static String Describe(Exception e)
+        {
+            WebException web = e as WebException;
+            HttpWebResponse response = (web != null) ? (web.Response as HttpWebResponse) : null;
+            return (response != null)
+                ? ("Server answered " + (Int32) response.StatusCode + " " + response.StatusDescription)
+                : e.Message;
+        }
+
+        /// <summary>
+        /// Wait a bit before trying again, unless we are stopped meanwhile.
+        /// </summary>
+        private void Pause(Int32 milliseconds)
+        {
+            for (Int32 waited = 0; waited < milliseconds && !stopped; waited += 100)
+                Thread.Sleep(100);
+        }
+
         private void Serve(TcpClient client)
         {
-            Remote remote = null;
+            PlayerConnection player = null;
+            String answeredType = null;
+            Stream output = null;
+
+            Int32 failedOpens = 0;
+            Queue<DateTime> drops = new Queue<DateTime>();
 
             try
             {
                 client.NoDelay = true;
                 NetworkStream local = client.GetStream();
                 ReadRequest(local);
+                player = new PlayerConnection(local);
 
-                try
-                {
-                    remote = OpenFollowingPlaylists(target);
-                }
-                catch (Exception e)
-                {
-                    WebException web = e as WebException;
-                    HttpWebResponse r = (web != null) ? (web.Response as HttpWebResponse) : null;
-                    lastError = (r != null)
-                        ? ("Server answered " + (Int32) r.StatusCode + " " + r.StatusDescription)
-                        : e.Message;
-
-                    WriteText(local, "HTTP/1.0 502 Bad Gateway\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
-                    return;
-                }
-
-                String contentType = remote.ContentType;
-                if (String.IsNullOrEmpty(contentType))
-                    contentType = "application/octet-stream";
-
-                lastError = null;
-
-                // with "icy-metaint: N" the server inserts a metadata block after
-                // every N audio bytes; they are removed before anything else sees the audio:
-                Stream audio = (remote.MetaInterval > 0)
-                    ? new IcyMetadataStream(remote.Body, remote.MetaInterval, ReportTitle)
-                    : remote.Body;
-
-                // Ogg streams: the MediaPlayer can't read Ogg at all, but it plays
-                // native FLAC, so Ogg FLAC is unwrapped on the fly (lossless, no re-encoding).
-                // Anything else (including other Ogg codecs) is passed through unchanged.
-                if (contentType.IndexOf("ogg", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    OggFlacRemuxer remuxer = new OggFlacRemuxer(audio);
-                    Boolean isFlac = remuxer.Start();
-                    String outputType = isFlac ? "audio/flac" : contentType;
-
-                    WriteText(local,
-                        "HTTP/1.0 200 OK\r\n" +
-                        "Content-Type: " + (isFlac ? "audio/flac" : contentType) + "\r\n" +
-                        "Cache-Control: no-cache\r\n" +
-                        "Connection: close\r\n\r\n");
-
-                    // the first FLAC write is the header, which every recording needs:
-                    Stream output = new StreamRecorder.Tee(local, Recorder, outputType, isFlac);
-
-                    if (isFlac)
-                        remuxer.CopyFlacTo(output, () => stopped, ReportTitle);
-                    else
-                        remuxer.CopyRawTo(output, () => stopped);
-                    return;
-                }
-
-                WriteText(local,
-                    "HTTP/1.0 200 OK\r\n" +
-                    "Content-Type: " + contentType + "\r\n" +
-                    "Cache-Control: no-cache\r\n" +
-                    "Connection: close\r\n\r\n");
-
-                Stream tee = new StreamRecorder.Tee(local, Recorder, contentType, false);
-
-                Byte[] buffer = new Byte[16384];
+                // a station that drops the connection (server restart, network
+                // hiccup) is connected again, so that playback just goes on:
                 while (!stopped)
                 {
-                    Int32 read = audio.Read(buffer, 0, buffer.Length);
-                    if (read <= 0)
-                        break;
+                    Remote remote = null;
 
-                    tee.Write(buffer, 0, read);
+                    try
+                    {
+                        try
+                        {
+                            remote = OpenFollowingPlaylists(target);
+                        }
+                        catch (Exception e)
+                        {
+                            lastError = Describe(e);
+                            failedOpens++;
+
+                            // gone for good, or a station that never sent a byte:
+                            Boolean give_up = IsFinal(e)
+                                || failedOpens >= MaxOpenAttempts
+                                || (player.Written == 0 && failedOpens >= MaxSilentAttempts);
+
+                            if (give_up)
+                            {
+                                if (answeredType == null)
+                                    WriteText(local, "HTTP/1.0 502 Bad Gateway\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+                                return;
+                            }
+
+                            Pause(Math.Min(5000, 1000 * failedOpens));
+                            continue;
+                        }
+
+                        failedOpens = 0;
+
+                        String contentType = remote.ContentType;
+                        if (String.IsNullOrEmpty(contentType))
+                            contentType = "application/octet-stream";
+
+                        // with "icy-metaint: N" the server inserts a metadata block after
+                        // every N audio bytes; they are removed before anything else sees the audio:
+                        Stream audio = (remote.MetaInterval > 0)
+                            ? new IcyMetadataStream(remote.Body, remote.MetaInterval, ReportTitle)
+                            : remote.Body;
+
+                        // Ogg streams: the MediaPlayer can't read Ogg at all, but it plays
+                        // native FLAC, so Ogg FLAC is unwrapped on the fly (lossless, no re-encoding).
+                        // Anything else (including other Ogg codecs) is passed through unchanged.
+                        Boolean isOgg = contentType.IndexOf("ogg", StringComparison.OrdinalIgnoreCase) >= 0;
+                        OggFlacRemuxer remuxer = null;
+                        Boolean isFlac = false;
+
+                        if (isOgg)
+                        {
+                            remuxer = new OggFlacRemuxer(audio);
+                            isFlac = remuxer.Start();
+                        }
+
+                        String outputType = isFlac ? "audio/flac" : contentType;
+
+                        // the player gets one answer; after a reconnection the audio just continues:
+                        if (answeredType == null)
+                        {
+                            WriteText(player,
+                                "HTTP/1.0 200 OK\r\n" +
+                                "Content-Type: " + outputType + "\r\n" +
+                                "Cache-Control: no-cache\r\n" +
+                                "Connection: close\r\n\r\n");
+
+                            answeredType = outputType;
+
+                            // with FLAC, the first write is the header, which every recording needs:
+                            output = new StreamRecorder.Tee(player, Recorder, outputType, isFlac);
+                        }
+
+                        lastError = null;
+                        Int64 before = player.Written;
+
+                        if (isFlac)
+                        {
+                            // the header goes out once, the player is already past it:
+                            remuxer.CopyFlacTo(output, () => stopped, ReportTitle, before == 0);
+                        }
+                        else if (isOgg)
+                        {
+                            remuxer.CopyRawTo(output, () => stopped);
+                        }
+                        else
+                        {
+                            Byte[] buffer = new Byte[16384];
+                            while (!stopped)
+                            {
+                                Int32 read = audio.Read(buffer, 0, buffer.Length);
+                                if (read <= 0)
+                                    break;
+
+                                output.Write(buffer, 0, read);
+                            }
+                        }
+
+                        if (stopped)
+                            return;
+
+                        lastError = "The station closed the connection.";
+                        if (player.Written == before)
+                            failedOpens = MaxSilentAttempts - 1;
+                    }
+                    catch (Exception e)
+                    {
+                        // the player closed the connection (stop/switch): we are done
+                        if (stopped || player.Failed)
+                            return;
+
+                        // the station or the network failed: try again below
+                        lastError = e.Message;
+                    }
+                    finally
+                    {
+                        if (remote != null)
+                            remote.Dispose();
+                    }
+
+                    // a station that keeps dropping is not worth hammering:
+                    DateTime now = DateTime.UtcNow;
+                    while (drops.Count > 0 && (now - drops.Peek()).TotalSeconds > 60)
+                        drops.Dequeue();
+
+                    drops.Enqueue(now);
+                    if (drops.Count > MaxDropsPerMinute)
+                    {
+                        lastError = "The station keeps dropping the connection.";
+                        return;
+                    }
+
+                    Pause(1000);
                 }
             }
             catch (Exception e)
             {
                 // the player closed the connection (stop/switch) or the network failed:
-                if (!stopped)
+                if (!stopped && (player == null || !player.Failed))
                     lastError = e.Message;
             }
             finally
             {
-                if (remote != null)
-                    remote.Dispose();
-
                 client.Close();
             }
         }

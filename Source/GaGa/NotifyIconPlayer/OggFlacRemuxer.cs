@@ -164,7 +164,7 @@ namespace GaGa.NotifyIconPlayer
         /// <summary>
         /// Write a native FLAC stream: "fLaC" + STREAMINFO, then audio frames.
         /// </summary>
-        public void CopyFlacTo(Stream output, Func<Boolean> stopped, Action<String> onTitle)
+        public void CopyFlacTo(Stream output, Func<Boolean> stopped, Action<String> onTitle, Boolean writeHeader = true)
         {
             sniffed = null;
 
@@ -173,7 +173,8 @@ namespace GaGa.NotifyIconPlayer
             Byte[] head = new Byte[4 + 4 + 34];
             Array.Copy(firstPacket, 9, head, 0, head.Length);
             head[4] |= 0x80;
-            output.Write(head, 0, head.Length);
+            if (writeHeader)
+                output.Write(head, 0, head.Length);
 
             while (!stopped())
             {

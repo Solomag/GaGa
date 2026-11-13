@@ -70,6 +70,18 @@ namespace GaGa
         public Int32 OptionsTheme;
 
         /// <summary>
+        /// Recently played stations, newest first: "name TAB uri".
+        /// </summary>
+        [OptionalField]
+        public String[] RecentStations;
+
+        /// <summary>
+        /// Track history, newest first: "time TAB station TAB title".
+        /// </summary>
+        [OptionalField]
+        public String[] TrackHistory;
+
+        /// <summary>
         /// Stores program settings.
         /// </summary>
         public GaGaSettings()
