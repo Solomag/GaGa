@@ -73,6 +73,8 @@ namespace GaGa
         private readonly ToolStripMenuItem optionsStartWithWindowsItem;
         private readonly ToolStripMenuItem optionsCheckUpdatesItem;
         private readonly ToolStripMenuItem optionsCheckUpdatesNowItem;
+        private readonly ToolStripMenuItem optionsThemeItem;
+        private readonly ToolStripMenuItem[] optionsThemeItems;
 
         // updates:
         private readonly System.Windows.Forms.Timer updateCheckTimer;
@@ -174,15 +176,7 @@ namespace GaGa
             volumeTrackBar.TrackBar.LargeChange = 10;
             volumeTrackBar.TrackBar.TickFrequency = 10;
 
-            // adjust the backcolor to the renderer:
-            Color back = toolStripRenderer.ColorTable.ToolStripDropDownBackground;
-
-            balanceTrackBar.BackColor = back;
-            balanceTrackBar.Label.BackColor = back;
-            balanceTrackBar.TrackBar.BackColor = back;
-            volumeTrackBar.BackColor = back;
-            volumeTrackBar.Label.BackColor = back;
-            volumeTrackBar.TrackBar.BackColor = back;
+            // the backcolor of the trackbars follows the renderer, see ThemeUpdate()
 
             audioMenuItem.DropDownItems.Add(balanceTrackBar);
             audioMenuItem.DropDownItems.Add(volumeTrackBar);
@@ -213,6 +207,22 @@ namespace GaGa
             optionsCheckUpdatesNowItem = new ToolStripMenuItem();
             optionsCheckUpdatesNowItem.Text = "Check for updates now";
 
+            optionsThemeItem = new ToolStripMenuItem();
+            optionsThemeItem.Text = "Theme";
+            optionsThemeItems = new ToolStripMenuItem[]
+            {
+                new ToolStripMenuItem("Same as Windows"),
+                new ToolStripMenuItem("Light"),
+                new ToolStripMenuItem("Dark"),
+            };
+            for (Int32 i = 0; i < optionsThemeItems.Length; i++)
+            {
+                ThemeMode mode = (ThemeMode) i;
+                optionsThemeItems[i].Click += (s, args) => ThemeSet(mode);
+                optionsThemeItem.DropDownItems.Add(optionsThemeItems[i]);
+            }
+
+            optionsMenuItem.DropDownItems.Add(optionsThemeItem);
             optionsMenuItem.DropDownItems.Add(optionsStartWithWindowsItem);
             optionsMenuItem.DropDownItems.Add(new ToolStripSeparator());
             optionsMenuItem.DropDownItems.Add(optionsCheckUpdatesItem);
@@ -241,6 +251,8 @@ namespace GaGa
             optionsEnableMultimediaKeysItem.Checked = settings.OptionsEnableMultimediaKeysChecked;
             optionsEnableTrackNotificationsItem.Checked = settings.OptionsEnableTrackNotificationsChecked;
             optionsCheckUpdatesItem.Checked = settings.OptionsCheckForUpdatesChecked;
+            Theme.Mode = (ThemeMode) Math.Max(0, Math.Min(2, settings.OptionsTheme));
+            ThemeUpdate();
 
             // wire events:
             notifyIcon.ContextMenuStrip.Opening += OnMenuOpening;
@@ -543,6 +555,7 @@ namespace GaGa
             }
 
             toolStripRenderer.UpdateColors();
+            ThemeUpdate();
             MenuMarkCurrentStream();
             MenuUpdateStates();
 
@@ -857,6 +870,8 @@ namespace GaGa
                 searchDialog = new SearchDialog(streamsFilepath);
                 searchDialog.PlayRequested += (name, uri) => player.Play(new PlayerStream(name, uri));
                 searchDialog.FormClosed += (s, args) => searchDialog = null;
+                Theme.Apply(searchDialog);
+                searchDialog.HandleCreated += (s, args) => Theme.ApplyTitleBar((Form) s);
                 searchDialog.Show();
             }
 
@@ -920,6 +935,7 @@ namespace GaGa
             settings.OptionsEnableMultimediaKeysChecked = optionsEnableMultimediaKeysItem.Checked;
             settings.OptionsEnableTrackNotificationsChecked = optionsEnableTrackNotificationsItem.Checked;
             settings.OptionsCheckForUpdatesChecked = optionsCheckUpdatesItem.Checked;
+            settings.OptionsTheme = (Int32) Theme.Mode;
             SettingsSave();
 
             // unhook, but don't be annoying with error messages on shutdown:

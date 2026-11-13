@@ -10,7 +10,7 @@ if not "%~1"=="" set OUT=%~1
 if not exist "%OUT%" mkdir "%OUT%"
 
 "%FW%\csc.exe" /nologo /target:winexe /optimize+ /out:"%OUT%\GaGa.exe" ^
-  /win32icon:NotifyIconPlayer\Resources\Idle.ico ^
+  /win32icon:App.ico ^
   /reference:System.dll /reference:System.Drawing.dll /reference:System.Runtime.Serialization.dll /reference:System.Windows.Forms.dll ^
   /reference:"%FW%\WPF\PresentationCore.dll" /reference:"%FW%\WPF\WindowsBase.dll" ^
   /resource:StreamsFile\Resources\Streams.ini,GaGa.StreamsFile.Resources.Streams.ini ^

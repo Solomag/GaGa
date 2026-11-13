@@ -49,7 +49,7 @@ namespace GaGa.Search
             this.streamsFilepath = streamsFilepath;
 
             Text = "GaGa - Search stations";
-            Icon = global::GaGa.NotifyIconPlayer.Util.ResourceAsIcon("GaGa.NotifyIconPlayer.Resources.Playing.ico");
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             StartPosition = FormStartPosition.CenterScreen;
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(760, 480);

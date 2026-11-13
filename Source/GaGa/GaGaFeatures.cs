@@ -4,10 +4,12 @@
 
 using System;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 
+using GaGa.Controls;
 using GaGa.NotifyIconPlayer;
 using GaGa.StreamsFile;
 
@@ -46,6 +48,44 @@ namespace GaGa
             recordOpenFolderItem.Enabled = Directory.Exists(recordingsFolder);
 
             optionsStartWithWindowsItem.Checked = Autostart.IsEnabled;
+        }
+
+        ///
+        /// Theme
+        ///
+
+        /// <summary>
+        /// Colors that the renderer doesn't paint itself: the trackbars
+        /// in the audio menu, the theme checkmarks and the search window.
+        /// </summary>
+        private void ThemeUpdate()
+        {
+            Color back = toolStripRenderer.ColorTable.ToolStripDropDownBackground;
+            Color fore = Theme.IsDark ? Theme.DarkText : SystemColors.ControlText;
+
+            foreach (ToolStripLabeledTrackBar bar in new ToolStripLabeledTrackBar[] { balanceTrackBar, volumeTrackBar })
+            {
+                bar.BackColor = back;
+                bar.Label.BackColor = back;
+                bar.Label.ForeColor = fore;
+                bar.TrackBar.BackColor = back;
+            }
+
+            for (Int32 i = 0; i < optionsThemeItems.Length; i++)
+                optionsThemeItems[i].Checked = (Int32) Theme.Mode == i;
+
+            if (searchDialog != null && !searchDialog.IsDisposed)
+            {
+                Theme.Apply(searchDialog);
+                Theme.ApplyTitleBar(searchDialog);
+            }
+        }
+
+        private void ThemeSet(ThemeMode mode)
+        {
+            Theme.Mode = mode;
+            ThemeUpdate();
+            notifyIcon.ContextMenuStrip.Invalidate();
         }
 
         ///

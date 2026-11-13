@@ -41,6 +41,8 @@ Issues and suggestions: https://github.com/Solomag/GaGa/issues
 * **Recording.** *Recording > Record this station* saves the stream as it
   plays (MP3, AAC or FLAC, no re-encoding) into a `Recordings` folder next to `GaGa.exe`.
 * **Start with Windows** (in *Options*), off by default.
+* **Dark theme** for the menu and the search window: follows Windows, or
+  pick *Options > Theme > Light / Dark*.
 * **Updates.** GaGa checks for a new release on startup (can be turned off in
   *Options*) and, if you agree, downloads it and restarts itself.
 * **Working default stations** (SomaFM, Radio Paradise, Radio Swiss, KEXP...).
@@ -54,7 +56,9 @@ GaGa is a very lightweight, simple online radio player that runs as an icon
 on the Windows tray. It's similar to [RadioTray][] for Linux. Here are two
 screenshots:
 
-![Screenshot1](Screenshot/Screenshot1.png)
+![GaGa menu, dark theme](Screenshot/menu-favorites-dark.png)
+![Options, light theme](Screenshot/menu-options-light.png)
+![Station search](Screenshot/search-dark.png)
 
 Left click on the icon toggles play/stop. Middle click (with the mouse wheel)
 toggles mute. Right click opens the menu with a list of streams. The icon

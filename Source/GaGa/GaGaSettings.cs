@@ -63,6 +63,13 @@ namespace GaGa
         public Boolean OptionsCheckForUpdatesChecked;
 
         /// <summary>
+        /// Menu theme: 0 follows Windows, 1 light, 2 dark.
+        /// Optional: 0 for files from older versions.
+        /// </summary>
+        [OptionalField]
+        public Int32 OptionsTheme;
+
+        /// <summary>
         /// Stores program settings.
         /// </summary>
         public GaGaSettings()
