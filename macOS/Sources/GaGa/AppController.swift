@@ -27,6 +27,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // recording submenu:
     lazy var recordingItem = NSMenuItem(title: "Recording", action: nil, keyEquivalent: "")
     lazy var recordToggleItem = menuItem("Record This Station", #selector(onRecordClicked))
+    lazy var recordM4aItem = NSMenuItem(title: "Save AAC Stations as .m4a", action: nil, keyEquivalent: "")
     lazy var recordFolderItem = menuItem("Show Recordings in Finder", #selector(onRecordFolderClicked))
 
     /// Section of the streams file that "Add to Favorites" writes to.
@@ -35,7 +36,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // audio submenu:
     private let volumeSlider = VolumeSliderView()
-    private lazy var audioItem = NSMenuItem(title: "Audio", action: nil, keyEquivalent: "")
+    private lazy var volumeItem = NSMenuItem()
+    private lazy var muteItem = NSMenuItem(title: "Mute", action: #selector(onMuteClicked), keyEquivalent: "")
 
     // options submenu:
     private lazy var optionsItem = NSMenuItem(title: "Options", action: nil, keyEquivalent: "")
@@ -82,6 +84,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         autoPlayItem.state = settings.autoPlay ? .on : .off
         mediaKeysItem.state = settings.mediaKeys ? .on : .off
         checkUpdatesItem.state = settings.checkUpdates ? .on : .off
+        recordM4aItem.state = settings.aacAsM4a ? .on : .off
+        StreamRecorder.aacAsM4a = settings.aacAsM4a
         player.setMediaKeysEnabled(settings.mediaKeys)
 
         let window = MainWindowController(player: player) { [weak self] in
@@ -169,6 +173,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settings.autoPlay = autoPlayItem.state == .on
         settings.mediaKeys = mediaKeysItem.state == .on
         settings.checkUpdates = checkUpdatesItem.state == .on
+        settings.aacAsM4a = recordM4aItem.state == .on
         settings.recent = recent
         settings.history = history
 
@@ -244,14 +249,14 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.windowController?.refreshControls()
         }
 
-        let volumeItem = NSMenuItem()
+        // right in the menu, no Audio submenu:
         volumeItem.view = volumeSlider
+        muteItem.target = self
+    }
 
-        let submenu = NSMenu(title: "Audio")
-        submenu.autoenablesItems = false
-        submenu.addItem(volumeItem)
-
-        audioItem.submenu = submenu
+    @objc private func onMuteClicked() {
+        player.toggleMute()
+        windowController?.refreshControls()
     }
 
     private func buildOptionsMenu() {
@@ -312,8 +317,12 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(historyItem)
         menu.addItem(recordingItem)
         menu.addItem(sleepItem)
-        menu.addItem(audioItem)
         menu.addItem(optionsItem)
+        menu.addItem(.separator())
+        menu.addItem(volumeItem)
+        muteItem.state = player.isMuted ? .on : .off
+        muteItem.isEnabled = !player.isIdle
+        menu.addItem(muteItem)
         menu.addItem(.separator())
         menu.addItem(quitItem)
 

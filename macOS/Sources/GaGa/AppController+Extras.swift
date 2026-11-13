@@ -20,7 +20,13 @@ extension AppController {
 
         if let sleepAt {
             let minutes = max(0, Int((sleepAt.timeIntervalSinceNow / 60).rounded(.up)))
-            sleepItem.title = "Sleep Timer (\(minutes) min left)"
+            if minutes > 120 {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "HH:mm"
+                sleepItem.title = "Sleep Timer (until \(formatter.string(from: sleepAt)))"
+            } else {
+                sleepItem.title = "Sleep Timer (\(minutes) min left)"
+            }
             sleepItem.state = .on
         } else {
             sleepItem.title = "Sleep Timer"
@@ -205,6 +211,7 @@ extension AppController {
             menu.addItem(item)
         }
 
+        menu.addItem(actionItem("Custom...", #selector(onSleepCustomClicked)))
         menu.addItem(.separator())
 
         let off = actionItem("Off", #selector(onSleepOffClicked))
@@ -215,11 +222,76 @@ extension AppController {
 
     @objc private func onSleepClicked(_ sender: NSMenuItem) {
         guard let minutes = sender.representedObject as? Int else { return }
+        startSleep(at: Date().addingTimeInterval(TimeInterval(minutes * 60)))
+    }
 
+    /// What the user typed for a custom sleep timer: "45" or "45m" (minutes),
+    /// "1h30" (duration) or "23:30" (a clock time, tomorrow when already past).
+    static func parseSleep(_ text: String, now: Date = Date()) -> Date? {
+        let t = text.lowercased().replacingOccurrences(of: " ", with: "")
+        guard !t.isEmpty else { return nil }
+
+        func match(_ pattern: String) -> [String]? {
+            guard let regex = try? NSRegularExpression(pattern: pattern),
+                  let m = regex.firstMatch(in: t, range: NSRange(t.startIndex..., in: t))
+            else { return nil }
+
+            return (0..<m.numberOfRanges).map { i in
+                Range(m.range(at: i), in: t).map { String(t[$0]) } ?? ""
+            }
+        }
+
+        if let g = match("^(\\d{1,4})(m|min|мин|м)?$"), let minutes = Int(g[1]), minutes > 0 {
+            return now.addingTimeInterval(TimeInterval(minutes * 60))
+        }
+
+        if let g = match("^(\\d{1,2})(h|ч)(\\d{1,2})?(m|min|мин|м)?$"), let hours = Int(g[1]) {
+            let minutes = hours * 60 + (Int(g[3]) ?? 0)
+            return minutes > 0 ? now.addingTimeInterval(TimeInterval(minutes * 60)) : nil
+        }
+
+        if let g = match("^(\\d{1,2})[:.](\\d{2})$"), let hours = Int(g[1]), let minutes = Int(g[2]),
+           hours < 24, minutes < 60 {
+            var at = Calendar.current.date(bySettingHour: hours, minute: minutes, second: 0, of: now) ?? now
+            if at <= now { at = at.addingTimeInterval(24 * 60 * 60) }
+            return at
+        }
+
+        return nil
+    }
+
+    @objc private func onSleepCustomClicked() {
+        let alert = NSAlert()
+        alert.messageText = "Sleep Timer"
+        alert.informativeText = "Stop playing after some minutes (like 45 or 1h30) or at a time (like 23:30):"
+        alert.addButton(withTitle: "Start")
+        alert.addButton(withTitle: "Cancel")
+
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 220, height: 24))
+        if let sleepAt {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            field.stringValue = formatter.string(from: sleepAt)
+        }
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+
+        NSApp.activate(ignoringOtherApps: true)
+
+        while alert.runModal() == .alertFirstButtonReturn {
+            if let at = Self.parseSleep(field.stringValue) {
+                startSleep(at: at)
+                return
+            }
+            NSSound.beep()
+        }
+    }
+
+    private func startSleep(at date: Date) {
         sleepTimer?.invalidate()
-        sleepAt = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        sleepAt = date
 
-        let timer = Timer(timeInterval: TimeInterval(minutes * 60), repeats: false) { [weak self] _ in
+        let timer = Timer(timeInterval: max(1, date.timeIntervalSinceNow), repeats: false) { [weak self] _ in
             self?.player.stop()
             self?.sleepTimer = nil
             self?.sleepAt = nil

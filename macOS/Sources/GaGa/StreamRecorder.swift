@@ -5,6 +5,7 @@
 // connection to the same stream, saved as received: no re-encoding, and no
 // ICY metadata (it is only sent to clients that ask for it).
 
+import AVFoundation
 import Foundation
 
 final class StreamRecorder: NSObject, URLSessionDataDelegate {
@@ -19,6 +20,13 @@ final class StreamRecorder: NSObject, URLSessionDataDelegate {
 
     /// Whether a recording is running.
     var isRecording: Bool { task != nil }
+
+    /// Move AAC recordings into .m4a when they are closed.
+    static var aacAsM4a = true
+
+    /// Called on the main queue when a recording is finished and in its
+    /// final place (after the .m4a move, if any).
+    var onSaved: ((URL) -> Void)?
 
     /// Called on the main queue when a recording stops on its own (an error,
     /// or the stream ending), with the reason.
@@ -68,8 +76,53 @@ final class StreamRecorder: NSObject, URLSessionDataDelegate {
     }
 
     private func closeFile() {
+        let wasOpen = file != nil
         try? file?.close()
         file = nil
+
+        guard wasOpen, let url = fileURL else { return }
+
+        if Self.aacAsM4a && url.pathExtension.lowercased() == "aac" {
+            moveToM4a(url)
+        } else {
+            onSaved?(url)
+        }
+    }
+
+    /// Rewrite a finished .aac recording as .m4a, copying the audio as is.
+    /// On any problem the .aac file stays.
+    private func moveToM4a(_ aac: URL) {
+        let base = aac.deletingPathExtension()
+        var m4a = base.appendingPathExtension("m4a")
+        var number = 2
+        while FileManager.default.fileExists(atPath: m4a.path) {
+            m4a = URL(fileURLWithPath: base.path + " (\(number))").appendingPathExtension("m4a")
+            number += 1
+        }
+
+        let asset = AVURLAsset(url: aac)
+        guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough) else {
+            onSaved?(aac)
+            return
+        }
+
+        export.outputURL = m4a
+        export.outputFileType = .m4a
+
+        export.exportAsynchronously { [weak self] in
+            DispatchQueue.main.async {
+                guard let self else { return }
+
+                if export.status == .completed {
+                    try? FileManager.default.removeItem(at: aac)
+                    if self.fileURL == aac { self.fileURL = m4a }
+                    self.onSaved?(m4a)
+                } else {
+                    try? FileManager.default.removeItem(at: m4a)
+                    self.onSaved?(aac)
+                }
+            }
+        }
     }
 
     //

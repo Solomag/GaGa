@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Windows.Forms;
 
+using GaGa.Controls;
 using GaGa.NotifyIconPlayer;
 
 
@@ -343,7 +344,7 @@ namespace GaGa
 
             sleepMenuItem.Checked = SleepActive;
             sleepMenuItem.Text = SleepActive
-                ? ("Sleep timer (" + SleepMinutesLeft + " min left)")
+                ? ("Sleep timer (" + ((SleepMinutesLeft > 120) ? ("until " + sleepAt.ToString("HH:mm")) : (SleepMinutesLeft + " min left")) + ")")
                 : "Sleep timer";
 
             foreach (Int32 minutes in SleepPresets)
@@ -353,6 +354,10 @@ namespace GaGa
                 item.Click += (s, e) => SleepStart(m);
                 sleepMenuItem.DropDownItems.Add(item);
             }
+
+            ToolStripMenuItem custom = new ToolStripMenuItem("Custom...");
+            custom.Click += (s, e) => SleepAskCustom();
+            sleepMenuItem.DropDownItems.Add(custom);
 
             sleepMenuItem.DropDownItems.Add(new ToolStripSeparator());
 
@@ -364,8 +369,122 @@ namespace GaGa
 
         private void SleepStart(Int32 minutes)
         {
-            sleepAt = DateTime.Now.AddMinutes(minutes);
+            SleepStartAt(DateTime.Now.AddMinutes(minutes));
+        }
+
+        private void SleepStartAt(DateTime at)
+        {
+            sleepAt = at;
             sleepTimer.Start();
+        }
+
+        /// <summary>
+        /// Parse what the user typed for a custom sleep timer:
+        /// "45" or "45m" (minutes), "1h30", "1:30h"... (duration),
+        /// or "23:30" (a clock time, tomorrow when it's already past).
+        /// Null when it can't be understood.
+        /// </summary>
+        internal static DateTime? SleepParse(String text, DateTime now)
+        {
+            String t = (text ?? "").Trim().ToLowerInvariant().Replace(" ", "");
+            if (t.Length == 0)
+                return null;
+
+            System.Text.RegularExpressions.Match m;
+
+            // plain minutes:
+            m = System.Text.RegularExpressions.Regex.Match(t, @"^(\d{1,4})(m|min|мин|м)?$");
+            if (m.Success)
+            {
+                Int32 minutes = Int32.Parse(m.Groups[1].Value);
+                return (minutes > 0) ? now.AddMinutes(minutes) : (DateTime?) null;
+            }
+
+            // hours and minutes: "1h", "1h30", "1h30m", "1ч30":
+            m = System.Text.RegularExpressions.Regex.Match(t, @"^(\d{1,2})(h|ч)(\d{1,2})?(m|min|мин|м)?$");
+            if (m.Success)
+            {
+                Int32 minutes = Int32.Parse(m.Groups[1].Value) * 60
+                              + (m.Groups[3].Success ? Int32.Parse(m.Groups[3].Value) : 0);
+                return (minutes > 0) ? now.AddMinutes(minutes) : (DateTime?) null;
+            }
+
+            // a clock time: "23:30", "7.15":
+            m = System.Text.RegularExpressions.Regex.Match(t, @"^(\d{1,2})[:.](\d{2})$");
+            if (m.Success)
+            {
+                Int32 hours = Int32.Parse(m.Groups[1].Value);
+                Int32 minutes = Int32.Parse(m.Groups[2].Value);
+                if (hours > 23 || minutes > 59)
+                    return null;
+
+                DateTime at = now.Date.AddHours(hours).AddMinutes(minutes);
+                if (at <= now)
+                    at = at.AddDays(1);
+                return at;
+            }
+
+            return null;
+        }
+
+        private void SleepAskCustom()
+        {
+            using (Form form = new Form())
+            {
+                form.Text = "GaGa - Sleep timer";
+                form.FormBorderStyle = FormBorderStyle.FixedDialog;
+                form.MaximizeBox = false;
+                form.MinimizeBox = false;
+                form.ShowInTaskbar = true;
+                form.StartPosition = FormStartPosition.CenterScreen;
+                form.AutoScaleMode = AutoScaleMode.Font;
+                form.ClientSize = new System.Drawing.Size(320, 118);
+                form.Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+
+                Label label = new Label();
+                label.Text = "Stop playing after (minutes, like 45 or 1h30)\nor at a time (like 23:30):";
+                label.SetBounds(12, 10, 296, 34);
+
+                TextBox box = new TextBox();
+                box.SetBounds(12, 48, 296, 23);
+                box.Text = SleepActive ? sleepAt.ToString("HH:mm") : "";
+
+                Button ok = new Button();
+                ok.Text = "Start";
+                ok.SetBounds(152, 82, 75, 26);
+                ok.DialogResult = DialogResult.OK;
+
+                Button cancel = new Button();
+                cancel.Text = "Cancel";
+                cancel.SetBounds(233, 82, 75, 26);
+                cancel.DialogResult = DialogResult.Cancel;
+
+                form.Controls.AddRange(new Control[] { label, box, ok, cancel });
+                form.AcceptButton = ok;
+                form.CancelButton = cancel;
+
+                // a time that can't be understood keeps the window open:
+                form.FormClosing += (s, e) =>
+                {
+                    if (form.DialogResult == DialogResult.OK && SleepParse(box.Text, DateTime.Now) == null)
+                    {
+                        e.Cancel = true;
+                        box.Focus();
+                        box.SelectAll();
+                        System.Media.SystemSounds.Beep.Play();
+                    }
+                };
+
+                Theme.Apply(form);
+                form.HandleCreated += (s, e) => Theme.ApplyTitleBar(form);
+
+                if (form.ShowDialog() == DialogResult.OK)
+                {
+                    DateTime? at = SleepParse(box.Text, DateTime.Now);
+                    if (at.HasValue)
+                        SleepStartAt(at.Value);
+                }
+            }
         }
 
         private void SleepStop()

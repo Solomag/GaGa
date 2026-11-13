@@ -93,12 +93,12 @@ namespace GaGa.NotifyIconPlayer
             else if (player.IsMuted)
             {
                 icon = playingMutedIcon;
-                text = "Playing (muted)";
+                text = "Muted";
             }
             else
             {
                 icon = playingIcon;
-                text = "Playing";
+                text = "Playing " + (Int32) Math.Round(player.Volume * 100) + "%";
             }
 
             // separator:
@@ -333,6 +333,11 @@ namespace GaGa.NotifyIconPlayer
         /// <summary>
         /// Determine whether the player is currently idle.
         /// </summary>
+        public Boolean IsMuted
+        {
+            get { return player.IsMuted; }
+        }
+
         public Boolean IsIdle
         {
             get
@@ -439,6 +444,7 @@ namespace GaGa.NotifyIconPlayer
             set
             {
                 player.Volume = value;
+                UpdateIcon();
             }
         }
 

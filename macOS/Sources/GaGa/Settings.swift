@@ -39,6 +39,9 @@ struct Settings: Codable {
     /// Track history, newest first.
     var history: [HistoryEntry] = []
 
+    /// Move AAC recordings into .m4a (same audio, more players open it).
+    var aacAsM4a: Bool = true
+
     init() {}
 
     /// Decode leniently, so that a file written by an older version
@@ -56,6 +59,7 @@ struct Settings: Codable {
             ?? defaults.checkUpdates
         recent = (try? container.decodeIfPresent([PlayerStream].self, forKey: .recent)) ?? []
         history = (try? container.decodeIfPresent([HistoryEntry].self, forKey: .history)) ?? []
+        aacAsM4a = (try? container.decodeIfPresent(Bool.self, forKey: .aacAsM4a)) ?? defaults.aacAsM4a
 
         volume = min(max(volume, 0), 1)
     }

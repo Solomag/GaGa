@@ -55,15 +55,16 @@ namespace GaGa
         private readonly ToolStripMenuItem recordMenuItem;
         private readonly ToolStripMenuItem recordToggleItem;
         private readonly ToolStripMenuItem recordOpenFolderItem;
+        private readonly ToolStripMenuItem recordM4aItem;
         private readonly String recordingsFolder;
 
         // station search window, while open:
         private SearchDialog searchDialog;
 
-        // audio submenu:
-        private readonly ToolStripMenuItem audioMenuItem;
+        // volume, right in the menu:
         private readonly ToolStripLabeledTrackBar volumeTrackBar;
-        private readonly ToolStripLabeledTrackBar balanceTrackBar;
+        private readonly ToolStripMenuItem muteItem;
+        private TrayIconWheel trayIconWheel;
 
         // options submenu:
         private readonly ToolStripMenuItem optionsMenuItem;
@@ -153,21 +154,20 @@ namespace GaGa
             recordOpenFolderItem = new ToolStripMenuItem();
             recordOpenFolderItem.Text = "Open recordings folder";
 
+            recordM4aItem = new ToolStripMenuItem();
+            recordM4aItem.Text = "Save AAC stations as .m4a";
+            recordM4aItem.ToolTipText = "Same audio, no re-encoding.\nMore players and phones open .m4a than raw .aac.";
+            recordM4aItem.CheckOnClick = true;
+
             recordMenuItem.DropDownItems.Add(recordToggleItem);
             recordMenuItem.DropDownItems.Add(recordOpenFolderItem);
+            recordMenuItem.DropDownItems.Add(new ToolStripSeparator());
+            recordMenuItem.DropDownItems.Add(recordM4aItem);
 
             exitItem = new ToolStripMenuItem();
             exitItem.Text = "E&xit";
 
-            // audio submenu:
-            audioMenuItem = new ToolStripMenuItem();
-            audioMenuItem.Text = "Audio";
-
-            balanceTrackBar = new ToolStripLabeledTrackBar();
-            balanceTrackBar.Label.Text = "Balance";
-            balanceTrackBar.TrackBar.Minimum = -10;
-            balanceTrackBar.TrackBar.Maximum = 10;
-
+            // volume:
             volumeTrackBar = new ToolStripLabeledTrackBar();
             volumeTrackBar.Label.Text = "Volume";
             volumeTrackBar.TrackBar.Minimum = 0;
@@ -176,10 +176,10 @@ namespace GaGa
             volumeTrackBar.TrackBar.LargeChange = 10;
             volumeTrackBar.TrackBar.TickFrequency = 10;
 
-            // the backcolor of the trackbars follows the renderer, see ThemeUpdate()
+            // the backcolor of the trackbar follows the renderer, see ThemeUpdate()
 
-            audioMenuItem.DropDownItems.Add(balanceTrackBar);
-            audioMenuItem.DropDownItems.Add(volumeTrackBar);
+            muteItem = new ToolStripMenuItem();
+            muteItem.Text = "&Mute";
 
             // options submenu:
             optionsMenuItem = new ToolStripMenuItem();
@@ -239,10 +239,11 @@ namespace GaGa
             KeyboardHook.Hooker.Add("Volume Down", Keys.VolumeDown);
 
             // apply settings before wiring events:
-            balanceTrackBar.TrackBar.Value = settings.LastBalanceTrackBarValue;
             volumeTrackBar.TrackBar.Value = Math.Max(0, Math.Min(100, settings.VolumePercent));
 
-            BalanceUpdate();
+            // the balance control is gone: always centered
+            // (the old setting stays untouched in the settings file):
+            player.Balance = 0;
             VolumeUpdate();
 
             player.Select(settings.LastPlayerStream);
@@ -251,6 +252,11 @@ namespace GaGa
             optionsEnableMultimediaKeysItem.Checked = settings.OptionsEnableMultimediaKeysChecked;
             optionsEnableTrackNotificationsItem.Checked = settings.OptionsEnableTrackNotificationsChecked;
             optionsCheckUpdatesItem.Checked = settings.OptionsCheckForUpdatesChecked;
+            recordM4aItem.Checked = !settings.RecordingKeepRawAac;
+            if (settings.SearchWindowWidth > 0 && settings.SearchWindowHeight > 0)
+                SearchDialog.LastSize = new Size(settings.SearchWindowWidth, settings.SearchWindowHeight);
+            StreamRecorder.AacAsM4a = recordM4aItem.Checked;
+            recordM4aItem.CheckedChanged += (s, args) => StreamRecorder.AacAsM4a = recordM4aItem.Checked;
             ExtrasInit();
             Theme.Mode = (ThemeMode) Math.Max(0, Math.Min(2, settings.OptionsTheme));
             ThemeUpdate();
@@ -274,8 +280,8 @@ namespace GaGa
             nowPlayingItem.Click += OnNowPlayingItemClick;
             player.TitleChanged += OnPlayerTitleChanged;
 
-            balanceTrackBar.TrackBar.ValueChanged += OnBalanceTrackBarChanged;
             volumeTrackBar.TrackBar.ValueChanged += OnVolumeTrackBarChanged;
+            muteItem.Click += (s, args) => player.ToggleMute();
 
             optionsEnableAutoPlayItem.CheckOnClick = true;
             optionsEnableTrackNotificationsItem.CheckOnClick = true;
@@ -300,6 +306,10 @@ namespace GaGa
 
             // the menu handle is used to get back to the UI thread, create it now:
             GC.KeepAlive(notifyIcon.ContextMenuStrip.Handle);
+
+            // the mouse wheel over the tray icon changes the volume:
+            trayIconWheel = new TrayIconWheel(notifyIcon);
+            trayIconWheel.Wheel += OnTrayIconWheel;
 
             if (optionsCheckUpdatesItem.Checked)
             {
@@ -483,8 +493,11 @@ namespace GaGa
             menu.Items.Add(historyMenuItem);
             menu.Items.Add(recordMenuItem);
             menu.Items.Add(sleepMenuItem);
-            menu.Items.Add(audioMenuItem);
             menu.Items.Add(optionsMenuItem);
+            menu.Items.Add("-");
+            menu.Items.Add(volumeTrackBar);
+            menu.Items.Add(muteItem);
+            menu.Items.Add("-");
             menu.Items.Add(exitItem);
         }
 
@@ -561,6 +574,9 @@ namespace GaGa
             MenuMarkCurrentStream();
             MenuUpdateStates();
             ExtrasMenuUpdate();
+            NowPlayingUpdate();
+            muteItem.Checked = player.IsMuted;
+            muteItem.Enabled = !player.IsIdle;
 
             notifyIcon.ContextMenuStrip.ResumeLayout();
             e.Cancel = false;
@@ -578,19 +594,10 @@ namespace GaGa
         private void OnPlayerTitleChanged(Object sender, EventArgs e)
         {
             String title = player.Title;
+            NowPlayingUpdate();
 
             if (title == null)
-            {
-                nowPlayingItem.Available = false;
-                nowPlayingSeparator.Available = false;
                 return;
-            }
-
-            // '&' would be taken as a menu mnemonic:
-            String text = (title.Length > 80) ? (title.Substring(0, 77) + "...") : title;
-            nowPlayingItem.Text = text.Replace("&", "&&");
-            nowPlayingItem.Available = true;
-            nowPlayingSeparator.Available = true;
 
             HistoryAdd(title, player.Source);
 
@@ -598,6 +605,35 @@ namespace GaGa
             {
                 notifyIcon.ShowBalloonTip(5000, player.Source.Name, title, ToolTipIcon.None);
             }
+        }
+
+        /// <summary>
+        /// The line on top of the menu: always there while a station is selected,
+        /// so that the menu doesn't jump when the track title arrives.
+        /// It shows the track when known, the station otherwise.
+        /// </summary>
+        private void NowPlayingUpdate()
+        {
+            PlayerStream source = player.Source;
+            Boolean show = source != null;
+
+            nowPlayingItem.Available = show;
+            nowPlayingSeparator.Available = show;
+            if (!show)
+                return;
+
+            String text;
+            if (player.Title != null)
+                text = player.Title;
+            else if (player.IsIdle)
+                text = source.Name + "  (stopped)";
+            else
+                text = source.Name;
+
+            // '&' would be taken as a menu mnemonic:
+            text = (text.Length > 80) ? (text.Substring(0, 77) + "...") : text;
+            nowPlayingItem.Text = text.Replace("&", "&&");
+            nowPlayingItem.ToolTipText = (player.Title != null) ? (source.Name + "\nClick to copy") : null;
         }
 
         /// <summary>
@@ -619,23 +655,16 @@ namespace GaGa
         }
 
         ///
-        /// Balance and volume updating
+        /// Volume updating
         ///
 
         /// <summary>
-        /// Update the balance label
-        /// and send the current value to the player.
+        /// Mouse wheel over the tray icon: 2% per notch.
         /// </summary>
-        private void BalanceUpdate()
+        private void OnTrayIconWheel(Int32 notches)
         {
-            Double current = (Double) balanceTrackBar.TrackBar.Value;
-            Double maximum = balanceTrackBar.TrackBar.Maximum;
-
-            Double balance = current / maximum;
-            Double percent = balance * 100;
-
-            balanceTrackBar.Label.Text = "Balance  " + percent.ToString();
-            player.Balance = balance;
+            TrackBar bar = volumeTrackBar.TrackBar;
+            bar.Value = Math.Max(bar.Minimum, Math.Min(bar.Maximum, bar.Value + 2 * notches));
         }
 
         /// <summary>
@@ -650,7 +679,7 @@ namespace GaGa
             Double volume = current / maximum;
             Double percent = volume * 100;
 
-            volumeTrackBar.Label.Text = "Volume  " + percent.ToString();
+            volumeTrackBar.Label.Text = "Volume  " + percent.ToString() + "%";
             player.Volume = volume;
         }
 
@@ -893,14 +922,6 @@ namespace GaGa
         }
 
         /// <summary>
-        /// Balance changed, update label and send new value to the player.
-        /// </summary>
-        private void OnBalanceTrackBarChanged(Object sender, EventArgs e)
-        {
-            BalanceUpdate();
-        }
-
-        /// <summary>
         /// Volume changed, update label and send new value to the player.
         /// </summary>
         private void OnVolumeTrackBarChanged(Object sender, EventArgs e)
@@ -938,7 +959,9 @@ namespace GaGa
         {
             player.Stop();
 
-            settings.LastBalanceTrackBarValue = balanceTrackBar.TrackBar.Value;
+            if (trayIconWheel != null)
+                trayIconWheel.Dispose();
+
             settings.LastVolumePercent = volumeTrackBar.TrackBar.Value;
             settings.LastVolumeTrackBarValue = (volumeTrackBar.TrackBar.Value + 2) / 5;
             settings.LastPlayerStream = player.Source;
@@ -947,6 +970,9 @@ namespace GaGa
             settings.OptionsEnableTrackNotificationsChecked = optionsEnableTrackNotificationsItem.Checked;
             settings.OptionsCheckForUpdatesChecked = optionsCheckUpdatesItem.Checked;
             settings.OptionsTheme = (Int32) Theme.Mode;
+            settings.RecordingKeepRawAac = !recordM4aItem.Checked;
+            settings.SearchWindowWidth = SearchDialog.LastSize.Width;
+            settings.SearchWindowHeight = SearchDialog.LastSize.Height;
             ExtrasSave();
             SettingsSave();
 

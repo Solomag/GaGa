@@ -23,6 +23,25 @@ namespace GaGa.NotifyIconPlayer
         private Byte[] header;      // written first in every new file (FLAC STREAMINFO)
         private FileStream file;
         private Object writer;      // only the newest player connection is recorded
+        private String firstTitle;  // first track heard while recording, for the .m4a tag
+
+        /// <summary>
+        /// Whether AAC recordings are moved into .m4a when they are closed
+        /// (same audio, a file that more players understand).
+        /// </summary>
+        public static Boolean AacAsM4a = true;
+
+        /// <summary>
+        /// The stream announced a track (any thread).
+        /// </summary>
+        public void NoteTitle(String title)
+        {
+            lock (sync)
+            {
+                if (file != null && firstTitle == null)
+                    firstTitle = title;
+            }
+        }
 
         /// <summary>
         /// Whether a recording was requested and hasn't failed.
@@ -134,6 +153,7 @@ namespace GaGa.NotifyIconPlayer
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
                 file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
                 FilePath = path;
+                firstTitle = null;
 
                 if (header != null)
                     file.Write(header, 0, header.Length);
@@ -163,6 +183,49 @@ namespace GaGa.NotifyIconPlayer
                 {
                 }
                 file = null;
+
+                if (AacAsM4a && FilePath != null && FilePath.EndsWith(".aac", StringComparison.OrdinalIgnoreCase))
+                    MoveToM4a();
+            }
+        }
+
+        /// <summary>
+        /// Rewrite the finished .aac recording as .m4a. On any problem
+        /// the .aac file stays as it is.
+        /// </summary>
+        private void MoveToM4a()
+        {
+            String aac = FilePath;
+            String m4a = null;
+
+            try
+            {
+                // too big to do in memory (more than ~1 GB is days of radio):
+                if (new FileInfo(aac).Length > 1L << 30)
+                    return;
+
+                String basePath = aac.Substring(0, aac.Length - 4);
+                m4a = basePath + ".m4a";
+                for (Int32 n = 2; File.Exists(m4a); n++)
+                    m4a = basePath + " (" + n + ").m4a";
+
+                if (AacToM4a.Convert(aac, m4a, firstTitle))
+                {
+                    File.Delete(aac);
+                    FilePath = m4a;
+                }
+            }
+            catch (Exception)
+            {
+                // keep the .aac, remove a half-written .m4a:
+                try
+                {
+                    if (m4a != null && File.Exists(m4a) && File.Exists(aac))
+                        File.Delete(m4a);
+                }
+                catch (Exception)
+                {
+                }
             }
         }
 

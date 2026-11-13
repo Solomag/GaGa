@@ -8,11 +8,22 @@ import ServiceManagement
 
 extension AppController {
 
+    @objc private func onRecordM4aClicked() {
+        recordM4aItem.state = recordM4aItem.state == .on ? .off : .on
+        StreamRecorder.aacAsM4a = recordM4aItem.state == .on
+    }
+
     func buildRecordingMenu() {
         let submenu = NSMenu(title: "Recording")
         submenu.autoenablesItems = false
         submenu.addItem(recordToggleItem)
         submenu.addItem(recordFolderItem)
+        submenu.addItem(.separator())
+
+        recordM4aItem.target = self
+        recordM4aItem.action = #selector(onRecordM4aClicked)
+        recordM4aItem.toolTip = "Same audio, no re-encoding. More players and phones open .m4a than raw .aac."
+        submenu.addItem(recordM4aItem)
 
         recordingItem.submenu = submenu
     }
@@ -93,12 +104,12 @@ extension AppController {
         let recorder = player.recorder
 
         if recorder.isRecording {
-            let file = recorder.fileURL
-            recorder.stop()
-
-            if let file {
+            // shown once the file is in its final place (.aac may become .m4a):
+            recorder.onSaved = { [weak recorder] file in
+                recorder?.onSaved = nil
                 NSWorkspace.shared.activateFileViewerSelecting([file])
             }
+            recorder.stop()
             return
         }
 

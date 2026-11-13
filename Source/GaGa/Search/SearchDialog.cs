@@ -9,6 +9,7 @@ using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
 
+using GaGa.NotifyIconPlayer;
 using GaGa.StreamsFile;
 
 
@@ -35,6 +36,18 @@ namespace GaGa.Search
         private readonly Button playButton;
         private readonly Button addButton;
         private readonly Button closeButton;
+        private readonly Label nowLabel;
+
+        // what the selected station plays, looked up after a short pause
+        // on the selection (one station at a time, a few seconds at most):
+        private readonly System.Windows.Forms.Timer nowTimer;
+        private Int32 nowNumber;
+        private Boolean refitting;
+
+        /// <summary>
+        /// Window size, kept between openings (and saved in the settings by GaGa).
+        /// </summary>
+        public static Size LastSize = Size.Empty;
 
         // results of an older search that finish late are ignored:
         private Int32 searchNumber;
@@ -53,7 +66,9 @@ namespace GaGa.Search
             StartPosition = FormStartPosition.CenterScreen;
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(760, 480);
-            MinimumSize = new Size(480, 300);
+            MinimumSize = new Size(520, 320);
+            if (!LastSize.IsEmpty)
+                Size = LastSize;
             ShowInTaskbar = true;
             KeyPreview = true;
 
@@ -63,25 +78,28 @@ namespace GaGa.Search
             top.AutoSize = true;
             top.ColumnCount = 3;
             top.RowCount = 1;
-            top.Padding = new Padding(6, 6, 6, 2);
+            top.Padding = new Padding(8, 8, 8, 4);
             top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
             queryTextBox = new TextBox();
-            queryTextBox.Dock = DockStyle.Fill;
-            queryTextBox.Margin = new Padding(3, 4, 3, 3);
+            queryTextBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            queryTextBox.Margin = new Padding(0, 0, 6, 0);
 
             fieldComboBox = new ComboBox();
             fieldComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
             fieldComboBox.Items.AddRange(new Object[] { "by name", "by genre", "by country" });
             fieldComboBox.SelectedIndex = 0;
-            fieldComboBox.Width = 110;
-            fieldComboBox.Margin = new Padding(3, 4, 3, 3);
+            fieldComboBox.Width = 120;
+            fieldComboBox.Anchor = AnchorStyles.Left;
+            fieldComboBox.Margin = new Padding(0, 0, 6, 0);
 
             searchButton = new Button();
             searchButton.Text = "&Search";
-            searchButton.AutoSize = true;
+            searchButton.Size = new Size(96, 27);
+            searchButton.Anchor = AnchorStyles.Left;
+            searchButton.Margin = new Padding(0);
 
             top.Controls.Add(queryTextBox, 0, 0);
             top.Controls.Add(fieldComboBox, 1, 0);
@@ -95,9 +113,29 @@ namespace GaGa.Search
             resultsListView.HideSelection = false;
             resultsListView.MultiSelect = false;
             resultsListView.Columns.Add("Station", 280);
-            resultsListView.Columns.Add("Country", 120);
+            resultsListView.Columns.Add("Country", 110);
             resultsListView.Columns.Add("Format", 90);
             resultsListView.Columns.Add("Genres", 240);
+            resultsListView.ClientSizeChanged += (sender, e) => ColumnsFit();
+
+            // the list sits in a panel, for even margins around it:
+            Panel middle = new Panel();
+            middle.Dock = DockStyle.Fill;
+            middle.Padding = new Padding(8, 4, 8, 0);
+            middle.Controls.Add(resultsListView);
+
+            // what the selected station is playing:
+            nowLabel = new Label();
+            nowLabel.Dock = DockStyle.Bottom;
+            nowLabel.Height = 26;
+            nowLabel.Padding = new Padding(10, 0, 10, 0);
+            nowLabel.TextAlign = ContentAlignment.MiddleLeft;
+            nowLabel.AutoEllipsis = true;
+            nowLabel.UseMnemonic = false;
+
+            nowTimer = new System.Windows.Forms.Timer();
+            nowTimer.Interval = 700;
+            nowTimer.Tick += (sender, e) => { nowTimer.Stop(); NowLookUp(); };
 
             // bottom row: status ............ [Play] [Add to streams file] [Close]
             TableLayoutPanel bottom = new TableLayoutPanel();
@@ -105,7 +143,7 @@ namespace GaGa.Search
             bottom.AutoSize = true;
             bottom.ColumnCount = 4;
             bottom.RowCount = 1;
-            bottom.Padding = new Padding(6, 2, 6, 6);
+            bottom.Padding = new Padding(8, 4, 8, 8);
             bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             bottom.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             bottom.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -115,19 +153,25 @@ namespace GaGa.Search
             statusLabel.Dock = DockStyle.Fill;
             statusLabel.TextAlign = ContentAlignment.MiddleLeft;
             statusLabel.AutoEllipsis = true;
+            statusLabel.UseMnemonic = false;
+            statusLabel.Margin = new Padding(2, 0, 6, 0);
             statusLabel.Text = "Search thousands of stations from radio-browser.info.";
 
             playButton = new Button();
             playButton.Text = "&Play";
-            playButton.AutoSize = true;
+            playButton.Size = new Size(90, 27);
+            playButton.Margin = new Padding(0, 0, 6, 0);
 
             addButton = new Button();
             addButton.Text = "&Add to streams file";
             addButton.AutoSize = true;
+            addButton.MinimumSize = new Size(0, 27);
+            addButton.Margin = new Padding(0, 0, 6, 0);
 
             closeButton = new Button();
             closeButton.Text = "Close";
-            closeButton.AutoSize = true;
+            closeButton.Size = new Size(90, 27);
+            closeButton.Margin = new Padding(0);
             closeButton.DialogResult = DialogResult.Cancel;
 
             bottom.Controls.Add(statusLabel, 0, 0);
@@ -136,8 +180,9 @@ namespace GaGa.Search
             bottom.Controls.Add(closeButton, 3, 0);
 
             // fill must be added first to be laid out last:
-            Controls.Add(resultsListView);
+            Controls.Add(middle);
             Controls.Add(top);
+            Controls.Add(nowLabel);
             Controls.Add(bottom);
 
             AcceptButton = searchButton;
@@ -148,7 +193,9 @@ namespace GaGa.Search
             addButton.Click += OnAddClick;
             closeButton.Click += (sender, e) => Close();
             resultsListView.ItemActivate += OnPlayClick;
-            resultsListView.SelectedIndexChanged += (sender, e) => UpdateButtons();
+            resultsListView.SelectedIndexChanged += (sender, e) => { UpdateButtons(); NowScheduleLookUp(); };
+            FormClosed += (sender, e) => { nowNumber++; nowTimer.Dispose(); };
+            ResizeEnd += (sender, e) => { if (WindowState == FormWindowState.Normal) LastSize = Size; };
 
             UpdateButtons();
         }
@@ -156,7 +203,129 @@ namespace GaGa.Search
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
+            ColumnsFit();
             queryTextBox.Focus();
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern Boolean ShowScrollBar(IntPtr hWnd, Int32 wBar, Boolean bShow);
+
+        /// <summary>
+        /// Columns share the width of the list: no empty column on the right.
+        /// </summary>
+        private void ColumnsFit()
+        {
+            // a few pixels short, so that no horizontal scrollbar shows up:
+            Int32 width = resultsListView.ClientSize.Width - 4;
+            if (width <= 0)
+                return;
+
+            Int32 station = width * 38 / 100;
+            Int32 country = width * 14 / 100;
+            Int32 format = width * 12 / 100;
+
+            resultsListView.Columns[0].Width = station;
+            resultsListView.Columns[1].Width = country;
+            resultsListView.Columns[2].Width = format;
+            // -2: the last column takes exactly what is left
+            resultsListView.Columns[3].Width = -2;
+
+            // the columns always fit: never a horizontal scrollbar
+            if (resultsListView.IsHandleCreated)
+                ShowScrollBar(resultsListView.Handle, 0 /* SB_HORZ */, false);
+
+            // the vertical scrollbar shows up after the items: fit again then
+            if (resultsListView.Items.Count > 0 && !refitting)
+            {
+                refitting = true;
+                BeginInvoke(new Action(() => { ColumnsFit(); refitting = false; }));
+            }
+        }
+
+        ///
+        /// Now playing on the selected station
+        ///
+
+        private void NowScheduleLookUp()
+        {
+            nowNumber++;
+            nowTimer.Stop();
+
+            RadioStation station = SelectedStation;
+            nowLabel.Text = (station == null) ? "" : ("Now on " + station.Name + ": ...");
+
+            if (station != null)
+                nowTimer.Start();
+        }
+
+        /// <summary>
+        /// Listen to the selected station for a few seconds, through the same
+        /// relay the player uses (so ICY, Ogg and HLS titles all work),
+        /// until it names the track. Nothing is played aloud.
+        /// </summary>
+        private void NowLookUp()
+        {
+            RadioStation station = SelectedStation;
+            if (station == null || station.StreamUri == null)
+                return;
+
+            Int32 number = nowNumber;
+            Uri uri = station.StreamUri;
+            String name = station.Name;
+
+            ThreadPool.QueueUserWorkItem(state =>
+            {
+                String title = null;
+                ManualResetEvent got = new ManualResetEvent(false);
+
+                try
+                {
+                    using (HttpsRelay relay = new HttpsRelay(uri))
+                    {
+                        relay.TitleChanged += t => { if (title == null) { title = t; got.Set(); } };
+
+                        System.Net.HttpWebRequest request = (System.Net.HttpWebRequest) System.Net.WebRequest.Create(relay.LocalUri);
+                        request.Timeout = 10000;
+                        request.ReadWriteTimeout = 10000;
+
+                        using (System.Net.WebResponse response = request.GetResponse())
+                        using (System.IO.Stream body = response.GetResponseStream())
+                        {
+                            Byte[] buffer = new Byte[16384];
+                            DateTime until = DateTime.UtcNow.AddSeconds(12);
+
+                            // read (and drop) audio until the title shows up:
+                            while (!got.WaitOne(0) && DateTime.UtcNow < until && number == nowNumber)
+                            {
+                                if (body.Read(buffer, 0, buffer.Length) <= 0)
+                                    break;
+                            }
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    // dead station, timeout: just no title
+                }
+
+                try
+                {
+                    if (!IsDisposed)
+                        BeginInvoke(new Action(() =>
+                        {
+                            if (number != nowNumber)
+                                return;
+
+                            nowLabel.Text = (title != null)
+                                ? ("Now on " + name + ":  " + title)
+                                : (name + " doesn't say what it plays.");
+                        }));
+                }
+                catch (InvalidOperationException)
+                {
+                    // closed meanwhile
+                }
+            });
         }
 
         private RadioStation SelectedStation

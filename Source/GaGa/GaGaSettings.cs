@@ -82,6 +82,22 @@ namespace GaGa
         public String[] TrackHistory;
 
         /// <summary>
+        /// Keep AAC recordings as raw .aac instead of moving them into .m4a.
+        /// Optional: false (so .m4a) for files from older versions.
+        /// </summary>
+        [OptionalField]
+        public Boolean RecordingKeepRawAac;
+
+        /// <summary>
+        /// Size of the search window (0: default).
+        /// </summary>
+        [OptionalField]
+        public Int32 SearchWindowWidth;
+
+        [OptionalField]
+        public Int32 SearchWindowHeight;
+
+        /// <summary>
         /// Stores program settings.
         /// </summary>
         public GaGaSettings()

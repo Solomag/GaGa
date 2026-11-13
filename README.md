@@ -34,18 +34,22 @@ Issues and suggestions: https://github.com/Solomag/GaGa/issues
   It works for any Icecast/SHOUTcast station, http or https.
 * **Station search.** *Search stations...* finds stations in the
   [radio-browser.info][] directory (by name, genre or country). You can listen
-  right away or add a station to your streams file in one click.
+  right away or add a station to your streams file in one click. The selected
+  station shows what it is playing right now.
 * **A checkmark on the station you're listening to**, and on the submenus that lead to it.
 * **Favorites.** *Add to favorites* puts the current station into a `[Favorites]`
   submenu at the top of the menu (it's just a section of your streams file),
   even when it's already in another submenu. *Remove from favorites* takes it out again.
 * **Recording.** *Recording > Record this station* saves the stream as it
   plays (MP3, AAC or FLAC, no re-encoding) into a `Recordings` folder next to `GaGa.exe`.
+  AAC stations are saved as `.m4a` (same audio, opens in more players), or as
+  raw `.aac` if you untick *Save AAC stations as .m4a*.
 * **Start with Windows** (in *Options*), off by default.
 * **Recent stations**: the last 15 you played, one click away.
 * **Track history**: the last 100 tracks with time and station; copy one or
   search for it on the web.
-* **Sleep timer**: stop playing after 15, 30, 60 or 120 minutes.
+* **Sleep timer**: stop playing after 15, 30, 60 or 120 minutes, or any time
+  you type (*Custom...*: `45`, `1h30` or a clock time like `23:30`).
 * **Reconnects by itself** when a station drops the connection, and gives up
   quickly (with the reason) on stations that are gone or send nothing.
 * **Dark theme** for the menu and the search window: follows Windows, or
@@ -74,7 +78,12 @@ reflects the current state (e.g. an animation while buffering).
 GaGa also implements global hotkeys using multimedia keys. Toggle them on
 or off in the options submenu if your keyboard has them.
 
-The volume moves in steps of 1% (the original had 5%).
+The volume slider and *Mute* are right in the menu, the mouse wheel over the
+tray icon changes the volume, and the icon tooltip shows it. The volume moves
+in steps of 1% (the original had 5%). The balance slider is gone.
+
+The top line of the menu shows the station while it connects and the track
+once the station names it, so the menu doesn't jump when the title arrives.
 
 On a modern system, GaGa typically uses about 16 MB of ram and 1% CPU while
 playing. It supports .m3u, .asx, .mp3 and basically everything that Windows

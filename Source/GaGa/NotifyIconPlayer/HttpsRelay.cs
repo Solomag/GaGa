@@ -100,6 +100,9 @@ namespace GaGa.NotifyIconPlayer
 
         private void ReportTitle(String title)
         {
+            if (!stopped && !String.IsNullOrEmpty(title))
+                Recorder.NoteTitle(title);
+
             Action<String> handler = TitleChanged;
             if (handler != null && !stopped && !String.IsNullOrEmpty(title))
                 handler(title);

@@ -65,8 +65,17 @@ namespace GaGa.Search
         {
             get
             {
-                String codec = String.IsNullOrEmpty(Codec) ? "?" : Codec;
-                return (Bitrate > 0) ? (codec + " " + Bitrate + "k") : codec;
+                String codec = Codec;
+                Boolean unknown = String.IsNullOrEmpty(codec) || codec.Equals("UNKNOWN", StringComparison.OrdinalIgnoreCase);
+
+                if (unknown)
+                {
+                    Uri uri = StreamUri;
+                    Boolean hls = Hls == 1 || (uri != null && uri.AbsolutePath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase));
+                    codec = hls ? "HLS" : "";
+                }
+
+                return (Bitrate > 0) ? (codec + " " + Bitrate + "k").Trim() : codec;
             }
         }
     }

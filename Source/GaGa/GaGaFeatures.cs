@@ -64,7 +64,7 @@ namespace GaGa
             Color back = toolStripRenderer.ColorTable.ToolStripDropDownBackground;
             Color fore = Theme.IsDark ? Theme.DarkText : SystemColors.ControlText;
 
-            foreach (ToolStripLabeledTrackBar bar in new ToolStripLabeledTrackBar[] { balanceTrackBar, volumeTrackBar })
+            foreach (ToolStripLabeledTrackBar bar in new ToolStripLabeledTrackBar[] { volumeTrackBar })
             {
                 bar.BackColor = back;
                 bar.Label.BackColor = back;
@@ -144,8 +144,8 @@ namespace GaGa
         {
             if (player.IsRecording)
             {
-                String path = player.RecordingPath;
                 player.StopRecording();
+                String path = player.RecordingPath;    // after stopping: .aac may have become .m4a
 
                 if (path != null)
                     notifyIcon.ShowBalloonTip(5000, "Recording saved", Path.GetFileName(path), ToolTipIcon.Info);

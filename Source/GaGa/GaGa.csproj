@@ -55,10 +55,12 @@
     <Compile Include="Controls\Theme.cs" />
     <Compile Include="Controls\ToolStripAeroRenderer.cs" />
     <Compile Include="Controls\ToolStripLabeledTrackBar.cs" />
+    <Compile Include="Controls\TrayIconWheel.cs" />
     <Compile Include="Controls\Util.cs" />
     <Compile Include="Libraries\LowKey\LowKey.cs" />
     <Compile Include="Libraries\mINI\mINI.cs" />
     <Compile Include="NotifyIconPlayer\HlsStream.cs" />
+    <Compile Include="NotifyIconPlayer\AacToM4a.cs" />
     <Compile Include="NotifyIconPlayer\HttpsRelay.cs" />
     <Compile Include="NotifyIconPlayer\OggFlacRemuxer.cs" />
     <Compile Include="NotifyIconPlayer\Player.cs" />
