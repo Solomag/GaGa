@@ -170,7 +170,7 @@ namespace GaGa
             volumeTrackBar.Label.Text = "Volume";
             volumeTrackBar.TrackBar.Minimum = 0;
             volumeTrackBar.TrackBar.Maximum = 100;
-            volumeTrackBar.TrackBar.SmallChange = 2;
+            volumeTrackBar.TrackBar.SmallChange = 1;
             volumeTrackBar.TrackBar.LargeChange = 10;
             volumeTrackBar.TrackBar.TickFrequency = 10;
 

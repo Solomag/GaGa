@@ -63,7 +63,7 @@ reflects the current state (e.g. an animation while buffering).
 GaGa also implements global hotkeys using multimedia keys. Toggle them on
 or off in the options submenu if your keyboard has them.
 
-The volume moves in steps of 2% (the original had 5%).
+The volume moves in steps of 1% (the original had 5%).
 
 On a modern system, GaGa typically uses about 16 MB of ram and 1% CPU while
 playing. It supports .m3u, .asx, .mp3 and basically everything that Windows
