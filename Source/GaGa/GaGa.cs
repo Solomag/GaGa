@@ -491,7 +491,6 @@ namespace GaGa
         private void MenuMarkCurrentStream()
         {
             PlayerStream current = player.Source;
-            Boolean found = false;
 
             foreach (ToolStripItem item in notifyIcon.ContextMenuStrip.Items)
             {
@@ -499,17 +498,17 @@ namespace GaGa
                     break;
 
                 ToolStripMenuItem menuItem = item as ToolStripMenuItem;
-                if (menuItem != null && menuItem != nowPlayingItem && MenuMarkCurrentStream(menuItem, current, found))
-                    found = true;
+                if (menuItem != null && menuItem != nowPlayingItem)
+                    MenuMarkCurrentStream(menuItem, current);
             }
         }
 
         /// <summary>
         /// Mark an item (recursively) when it is, or contains, the current stream.
-        /// Only the first match is marked when a stream is listed more than once.
+        /// A stream listed more than once (e.g. also in Favorites) is marked everywhere.
         /// Returns whether the item was marked.
         /// </summary>
-        private Boolean MenuMarkCurrentStream(ToolStripMenuItem item, PlayerStream current, Boolean alreadyFound)
+        private Boolean MenuMarkCurrentStream(ToolStripMenuItem item, PlayerStream current)
         {
             Boolean marked = false;
 
@@ -518,18 +517,17 @@ namespace GaGa
                 foreach (ToolStripItem child in item.DropDownItems)
                 {
                     ToolStripMenuItem childItem = child as ToolStripMenuItem;
-                    if (childItem != null && MenuMarkCurrentStream(childItem, current, alreadyFound || marked))
+                    if (childItem != null && MenuMarkCurrentStream(childItem, current))
                         marked = true;
                 }
             }
             else
             {
                 Uri uri = item.Tag as Uri;
-                marked = !alreadyFound
-                      && current != null
+                // by address: the same station may have another name in Favorites
+                marked = current != null
                       && uri != null
-                      && uri == current.Uri
-                      && item.Text == current.Name;
+                      && uri == current.Uri;
             }
 
             item.Checked = marked;
