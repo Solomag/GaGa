@@ -446,8 +446,10 @@ namespace GaGa.NotifyIconPlayer
 
             Stop();
 
-            String title = "Unable to play: " + Source.Name;
-            String text = reason + "\n" + Source.Uri;
+            // Source can be null when MediaPlayer itself is missing
+            // (e.g. Windows N editions without the Media Feature Pack):
+            String title = (Source == null) ? "Unable to play" : "Unable to play: " + Source.Name;
+            String text = (Source == null) ? reason : reason + "\n" + Source.Uri;
 
             notifyIcon.ShowBalloonTip(10, title, text, ToolTipIcon.Error);
         }
