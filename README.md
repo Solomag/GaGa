@@ -79,7 +79,8 @@ GaGa also implements global hotkeys using multimedia keys. Toggle them on
 or off in the options submenu if your keyboard has them.
 
 The volume slider and *Mute* are right in the menu, the mouse wheel over the
-tray icon changes the volume, and the icon tooltip shows it. The volume moves
+tray icon changes the volume (the icon shows the percent for a moment; the
+step, 1 to 10%, is in *Options > Volume step*), and the icon tooltip shows it. The volume moves
 in steps of 1% (the original had 5%). The balance slider is gone.
 
 The top line of the menu shows the station while it connects and the track

@@ -98,6 +98,13 @@ namespace GaGa
         public Int32 SearchWindowHeight;
 
         /// <summary>
+        /// Volume step for the mouse wheel and the volume keys, in percent
+        /// (0: the default, 2).
+        /// </summary>
+        [OptionalField]
+        public Int32 VolumeStep;
+
+        /// <summary>
         /// Stores program settings.
         /// </summary>
         public GaGaSettings()

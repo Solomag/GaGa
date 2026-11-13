@@ -66,6 +66,8 @@
     <Compile Include="NotifyIconPlayer\Player.cs" />
     <Compile Include="NotifyIconPlayer\PlayerStream.cs" />
     <Compile Include="NotifyIconPlayer\Util.cs" />
+    <Compile Include="NotifyIconPlayer\StreamRecorder.cs" />
+    <Compile Include="NotifyIconPlayer\VolumeIcon.cs" />
     <Compile Include="Search\RadioBrowser.cs" />
     <Compile Include="Search\SearchDialog.cs" />
     <Compile Include="StreamsFile\StreamsFileLoader.cs" />

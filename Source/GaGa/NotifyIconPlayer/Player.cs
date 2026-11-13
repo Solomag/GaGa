@@ -29,6 +29,10 @@ namespace GaGa.NotifyIconPlayer
         private readonly Icon[] bufferingIcons;
 
         private readonly DispatcherTimer bufferingIconTimer;
+
+        // the volume percent, shown on the icon for a moment:
+        private readonly DispatcherTimer volumeIconTimer;
+        private System.Drawing.Icon volumeIcon;
         private Int32 currentBufferingIcon;
 
         /// <summary>
@@ -63,6 +67,16 @@ namespace GaGa.NotifyIconPlayer
             bufferingIconTimer = new DispatcherTimer(DispatcherPriority.Background);
             bufferingIconTimer.Interval = TimeSpan.FromMilliseconds(300);
             bufferingIconTimer.Tick += OnBufferingIconTimerTick;
+
+            volumeIconTimer = new DispatcherTimer(DispatcherPriority.Background);
+            volumeIconTimer.Interval = TimeSpan.FromMilliseconds(1500);
+            volumeIconTimer.Tick += (sender, e) =>
+            {
+                volumeIconTimer.Stop();
+                UpdateIcon();
+                VolumeIcon.Free(volumeIcon);
+                volumeIcon = null;
+            };
             currentBufferingIcon = 0;
 
             source = null;
@@ -120,7 +134,10 @@ namespace GaGa.NotifyIconPlayer
                 text += "\n" + title;
             }
 
-            notifyIcon.Icon = icon;
+            // the volume icon stays until its timer ends:
+            if (!volumeIconTimer.IsEnabled)
+                notifyIcon.Icon = icon;
+
             notifyIcon.SetToolTipText(text);
         }
 
@@ -333,6 +350,20 @@ namespace GaGa.NotifyIconPlayer
         /// <summary>
         /// Determine whether the player is currently idle.
         /// </summary>
+        /// <summary>
+        /// Show the volume percent on the tray icon for a moment.
+        /// </summary>
+        public void ShowVolumeIcon()
+        {
+            System.Drawing.Icon old = volumeIcon;
+            volumeIcon = VolumeIcon.Render((Int32) Math.Round(player.Volume * 100), player.IsMuted);
+            notifyIcon.Icon = volumeIcon;
+            VolumeIcon.Free(old);
+
+            volumeIconTimer.Stop();
+            volumeIconTimer.Start();
+        }
+
         public Boolean IsMuted
         {
             get { return player.IsMuted; }
@@ -477,7 +508,7 @@ namespace GaGa.NotifyIconPlayer
         {
             // change the icon when NOT muted
             // the mute icon has priority over the buffering icons:
-            if (!player.IsMuted)
+            if (!player.IsMuted && !volumeIconTimer.IsEnabled)
             {
                 notifyIcon.Icon = bufferingIcons[currentBufferingIcon];
             }

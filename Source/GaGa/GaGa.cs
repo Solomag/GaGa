@@ -65,6 +65,9 @@ namespace GaGa
         private readonly ToolStripLabeledTrackBar volumeTrackBar;
         private readonly ToolStripMenuItem muteItem;
         private TrayIconWheel trayIconWheel;
+        private readonly ToolStripMenuItem optionsVolumeStepItem;
+        private static readonly Int32[] VolumeSteps = { 1, 2, 5, 10 };
+        private Int32 volumeStep = 2;
 
         // options submenu:
         private readonly ToolStripMenuItem optionsMenuItem;
@@ -222,7 +225,24 @@ namespace GaGa
                 optionsThemeItem.DropDownItems.Add(optionsThemeItems[i]);
             }
 
+            optionsVolumeStepItem = new ToolStripMenuItem();
+            optionsVolumeStepItem.Text = "Volume step (wheel and keys)";
+            foreach (Int32 step in VolumeSteps)
+            {
+                Int32 value = step;
+                ToolStripMenuItem item = new ToolStripMenuItem(value + "%");
+                item.Tag = value;
+                item.Click += (s, args) => volumeStep = value;
+                optionsVolumeStepItem.DropDownItems.Add(item);
+            }
+            optionsVolumeStepItem.DropDownOpening += (s, args) =>
+            {
+                foreach (ToolStripMenuItem item in optionsVolumeStepItem.DropDownItems)
+                    item.Checked = (Int32) item.Tag == volumeStep;
+            };
+
             optionsMenuItem.DropDownItems.Add(optionsThemeItem);
+            optionsMenuItem.DropDownItems.Add(optionsVolumeStepItem);
             optionsMenuItem.DropDownItems.Add(optionsStartWithWindowsItem);
             optionsMenuItem.DropDownItems.Add(new ToolStripSeparator());
             optionsMenuItem.DropDownItems.Add(optionsCheckUpdatesItem);
@@ -253,6 +273,8 @@ namespace GaGa
             optionsEnableTrackNotificationsItem.Checked = settings.OptionsEnableTrackNotificationsChecked;
             optionsCheckUpdatesItem.Checked = settings.OptionsCheckForUpdatesChecked;
             recordM4aItem.Checked = !settings.RecordingKeepRawAac;
+            if (Array.IndexOf(VolumeSteps, settings.VolumeStep) >= 0)
+                volumeStep = settings.VolumeStep;
             if (settings.SearchWindowWidth > 0 && settings.SearchWindowHeight > 0)
                 SearchDialog.LastSize = new Size(settings.SearchWindowWidth, settings.SearchWindowHeight);
             StreamRecorder.AacAsM4a = recordM4aItem.Checked;
@@ -659,12 +681,21 @@ namespace GaGa
         ///
 
         /// <summary>
-        /// Mouse wheel over the tray icon: 2% per notch.
+        /// Mouse wheel over the tray icon: one step per notch.
         /// </summary>
         private void OnTrayIconWheel(Int32 notches)
         {
+            VolumeChangeBy(volumeStep * notches);
+        }
+
+        /// <summary>
+        /// Move the volume by some percent and show it on the tray icon.
+        /// </summary>
+        private void VolumeChangeBy(Int32 percent)
+        {
             TrackBar bar = volumeTrackBar.TrackBar;
-            bar.Value = Math.Max(bar.Minimum, Math.Min(bar.Maximum, bar.Value + 2 * notches));
+            bar.Value = Math.Max(bar.Minimum, Math.Min(bar.Maximum, bar.Value + percent));
+            player.ShowVolumeIcon();
         }
 
         /// <summary>
@@ -814,18 +845,12 @@ namespace GaGa
                 }
                 case "Volume Up":
                 {
-                    Int32 volume = volumeTrackBar.TrackBar.Value;
-                    Int32 volume_max = volumeTrackBar.TrackBar.Maximum;
-                    Int32 volume_step = volumeTrackBar.TrackBar.SmallChange;
-                    volumeTrackBar.TrackBar.Value = Math.Min(volume + volume_step, volume_max);
+                    VolumeChangeBy(volumeStep);
                     break;
                 }
                 case "Volume Down":
                 {
-                    Int32 volume = volumeTrackBar.TrackBar.Value;
-                    Int32 volume_min = volumeTrackBar.TrackBar.Minimum;
-                    Int32 volume_step = volumeTrackBar.TrackBar.SmallChange;
-                    volumeTrackBar.TrackBar.Value = Math.Max(volume - volume_step, volume_min);
+                    VolumeChangeBy(-volumeStep);
                     break;
                 }
             }
@@ -971,6 +996,7 @@ namespace GaGa
             settings.OptionsCheckForUpdatesChecked = optionsCheckUpdatesItem.Checked;
             settings.OptionsTheme = (Int32) Theme.Mode;
             settings.RecordingKeepRawAac = !recordM4aItem.Checked;
+            settings.VolumeStep = volumeStep;
             settings.SearchWindowWidth = SearchDialog.LastSize.Width;
             settings.SearchWindowHeight = SearchDialog.LastSize.Height;
             ExtrasSave();
