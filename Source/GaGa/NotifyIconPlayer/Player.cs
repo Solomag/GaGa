@@ -341,6 +341,66 @@ namespace GaGa.NotifyIconPlayer
             }
         }
 
+        ///
+        /// Recording
+        ///
+
+        /// <summary>
+        /// Whether the current stream can be recorded
+        /// (playing, through the relay: any http:// or https:// stream).
+        /// </summary>
+        public Boolean CanRecord
+        {
+            get { return !isIdle && relay != null; }
+        }
+
+        /// <summary>
+        /// Whether the current stream is being recorded.
+        /// Recording stops on its own when the stream stops or changes.
+        /// </summary>
+        public Boolean IsRecording
+        {
+            get { return relay != null && relay.Recorder.IsRecording; }
+        }
+
+        /// <summary>
+        /// File being recorded, or null.
+        /// </summary>
+        public String RecordingPath
+        {
+            get { return (relay != null) ? relay.Recorder.FilePath : null; }
+        }
+
+        /// <summary>
+        /// Last recording error, or null.
+        /// </summary>
+        public String RecordingError
+        {
+            get { return (relay != null) ? relay.Recorder.LastError : null; }
+        }
+
+        /// <summary>
+        /// Record the current stream into basePath plus an extension
+        /// that matches the stream format. False when it can't be recorded.
+        /// </summary>
+        public Boolean StartRecording(String basePath)
+        {
+            if (!CanRecord)
+                return false;
+
+            relay.Recorder.Start(basePath);
+            return true;
+        }
+
+        /// <summary>
+        /// Stop recording, keeping what was recorded.
+        /// </summary>
+        public void StopRecording()
+        {
+            if (relay != null)
+                relay.Recorder.Stop();
+        }
+
         /// <summary>
         /// Get the current player stream.
         /// </summary>

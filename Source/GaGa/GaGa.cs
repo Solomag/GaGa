@@ -9,6 +9,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Threading;
 using System.Windows.Forms;
 
 using GaGa.Controls;
@@ -21,7 +22,7 @@ using LowKey;
 
 namespace GaGa
 {
-    internal class GaGa : ApplicationContext
+    internal partial class GaGa : ApplicationContext
     {
         // gui components:
         private readonly Container container;
@@ -47,7 +48,14 @@ namespace GaGa
         private readonly ToolStripMenuItem errorReadItem;
         private readonly ToolStripMenuItem editItem;
         private readonly ToolStripMenuItem searchItem;
+        private readonly ToolStripMenuItem favoriteItem;
         private readonly ToolStripMenuItem exitItem;
+
+        // recording submenu:
+        private readonly ToolStripMenuItem recordMenuItem;
+        private readonly ToolStripMenuItem recordToggleItem;
+        private readonly ToolStripMenuItem recordOpenFolderItem;
+        private readonly String recordingsFolder;
 
         // station search window, while open:
         private SearchDialog searchDialog;
@@ -62,6 +70,16 @@ namespace GaGa
         private readonly ToolStripMenuItem optionsEnableAutoPlayItem;
         private readonly ToolStripMenuItem optionsEnableMultimediaKeysItem;
         private readonly ToolStripMenuItem optionsEnableTrackNotificationsItem;
+        private readonly ToolStripMenuItem optionsStartWithWindowsItem;
+        private readonly ToolStripMenuItem optionsCheckUpdatesItem;
+        private readonly ToolStripMenuItem optionsCheckUpdatesNowItem;
+
+        // updates:
+        private readonly System.Windows.Forms.Timer updateCheckTimer;
+        private Boolean updateCheckRunning;
+
+        /// <summary>Section of the streams file that "Add to favorites" writes to.</summary>
+        private const String FavoritesSection = "Favorites";
 
         /// <summary>
         /// GaGa implementation.
@@ -118,6 +136,24 @@ namespace GaGa
             searchItem = new ToolStripMenuItem();
             searchItem.Text = "&Search stations...";
 
+            favoriteItem = new ToolStripMenuItem();
+            favoriteItem.Text = "Add to &favorites";
+
+            // recording submenu:
+            recordingsFolder = Path.Combine(Util.ApplicationFolder, "Recordings");
+
+            recordMenuItem = new ToolStripMenuItem();
+            recordMenuItem.Text = "Recording";
+
+            recordToggleItem = new ToolStripMenuItem();
+            recordToggleItem.Text = "&Record this station";
+
+            recordOpenFolderItem = new ToolStripMenuItem();
+            recordOpenFolderItem.Text = "Open recordings folder";
+
+            recordMenuItem.DropDownItems.Add(recordToggleItem);
+            recordMenuItem.DropDownItems.Add(recordOpenFolderItem);
+
             exitItem = new ToolStripMenuItem();
             exitItem.Text = "E&xit";
 
@@ -165,6 +201,23 @@ namespace GaGa
             optionsMenuItem.DropDownItems.Add(optionsEnableMultimediaKeysItem);
             optionsMenuItem.DropDownItems.Add(optionsEnableTrackNotificationsItem);
 
+            optionsStartWithWindowsItem = new ToolStripMenuItem();
+            optionsStartWithWindowsItem.Text = "Start with Windows";
+
+            optionsCheckUpdatesItem = new ToolStripMenuItem();
+            optionsCheckUpdatesItem.Text = "Check for updates on startup";
+
+            optionsCheckUpdatesNowItem = new ToolStripMenuItem();
+            optionsCheckUpdatesNowItem.Text = "Check for updates now";
+
+            optionsMenuItem.DropDownItems.Add(optionsStartWithWindowsItem);
+            optionsMenuItem.DropDownItems.Add(new ToolStripSeparator());
+            optionsMenuItem.DropDownItems.Add(optionsCheckUpdatesItem);
+            optionsMenuItem.DropDownItems.Add(optionsCheckUpdatesNowItem);
+
+            updateCheckTimer = new System.Windows.Forms.Timer(container);
+            updateCheckTimer.Interval = 15000;
+
             // add multimedia keys:
             KeyboardHook.Hooker.Add("Toggle Play", Keys.MediaPlayPause);
             KeyboardHook.Hooker.Add("Stop", Keys.MediaStop);
@@ -184,6 +237,7 @@ namespace GaGa
             optionsEnableAutoPlayItem.Checked = settings.OptionsEnableAutoPlayChecked;
             optionsEnableMultimediaKeysItem.Checked = settings.OptionsEnableMultimediaKeysChecked;
             optionsEnableTrackNotificationsItem.Checked = settings.OptionsEnableTrackNotificationsChecked;
+            optionsCheckUpdatesItem.Checked = settings.OptionsCheckForUpdatesChecked;
 
             // wire events:
             notifyIcon.ContextMenuStrip.Opening += OnMenuOpening;
@@ -193,6 +247,13 @@ namespace GaGa
             errorReadItem.Click += OnErrorReadItemClick;
             editItem.Click += OnEditItemClick;
             searchItem.Click += OnSearchItemClick;
+            favoriteItem.Click += OnFavoriteItemClick;
+            recordToggleItem.Click += OnRecordToggleItemClick;
+            recordOpenFolderItem.Click += OnRecordOpenFolderItemClick;
+            optionsStartWithWindowsItem.Click += OnStartWithWindowsItemClick;
+            optionsCheckUpdatesItem.CheckOnClick = true;
+            optionsCheckUpdatesNowItem.Click += (s, args) => UpdateCheck(true);
+            updateCheckTimer.Tick += (s, args) => { updateCheckTimer.Stop(); UpdateCheck(false); };
             exitItem.Click += OnExitItemClick;
             nowPlayingItem.Click += OnNowPlayingItemClick;
             player.TitleChanged += OnPlayerTitleChanged;
@@ -215,6 +276,18 @@ namespace GaGa
             if (optionsEnableMultimediaKeysItem.Checked)
             {
                 MultimediaKeysHook();
+            }
+
+            // updates: tidy up after the last one, then check a bit after startup
+            // (the network may not be up yet when starting with Windows):
+            Updater.CleanUp();
+
+            // the menu handle is used to get back to the UI thread, create it now:
+            GC.KeepAlive(notifyIcon.ContextMenuStrip.Handle);
+
+            if (optionsCheckUpdatesItem.Checked)
+            {
+                updateCheckTimer.Start();
             }
         }
 
@@ -388,7 +461,9 @@ namespace GaGa
 
             menu.Items.Add(editItem);
             menu.Items.Add(searchItem);
+            menu.Items.Add(favoriteItem);
             menu.Items.Add("-");
+            menu.Items.Add(recordMenuItem);
             menu.Items.Add(audioMenuItem);
             menu.Items.Add(optionsMenuItem);
             menu.Items.Add(exitItem);
@@ -466,6 +541,7 @@ namespace GaGa
 
             toolStripRenderer.UpdateColors();
             MenuMarkCurrentStream();
+            MenuUpdateStates();
 
             notifyIcon.ContextMenuStrip.ResumeLayout();
             e.Cancel = false;
@@ -823,6 +899,14 @@ namespace GaGa
         /// </summary>
         private void OnExitItemClick(Object sender, EventArgs e)
         {
+            Exit();
+        }
+
+        /// <summary>
+        /// Stop playing, save settings, hide icon and exit.
+        /// </summary>
+        private void Exit()
+        {
             player.Stop();
 
             settings.LastBalanceTrackBarValue = balanceTrackBar.TrackBar.Value;
@@ -831,6 +915,7 @@ namespace GaGa
             settings.OptionsEnableAutoPlayChecked = optionsEnableAutoPlayItem.Checked;
             settings.OptionsEnableMultimediaKeysChecked = optionsEnableMultimediaKeysItem.Checked;
             settings.OptionsEnableTrackNotificationsChecked = optionsEnableTrackNotificationsItem.Checked;
+            settings.OptionsCheckForUpdatesChecked = optionsCheckUpdatesItem.Checked;
             SettingsSave();
 
             // unhook, but don't be annoying with error messages on shutdown:

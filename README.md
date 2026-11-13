@@ -34,6 +34,13 @@ Issues and suggestions: https://github.com/Solomag/GaGa/issues
   [radio-browser.info][] directory (by name, genre or country). You can listen
   right away or add a station to your streams file in one click.
 * **A checkmark on the station you're listening to**, and on the submenus that lead to it.
+* **Favorites.** *Add to favorites* puts the current station into a `[Favorites]`
+  submenu at the top of the menu (it's just a section of your streams file).
+* **Recording.** *Recording > Record this station* saves the stream as it
+  plays (MP3, AAC or FLAC, no re-encoding) into a `Recordings` folder next to `GaGa.exe`.
+* **Start with Windows** (in *Options*), off by default.
+* **Updates.** GaGa checks for a new release on startup (can be turned off in
+  *Options*) and, if you agree, downloads it and restarts itself.
 * **Working default stations** (SomaFM, Radio Paradise, Radio Swiss, KEXP...).
   The original ones were hosted on Radionomy, which shut down in 2020.
 
@@ -113,7 +120,9 @@ dependencies other than the .NET Framework 4.0+.
 There are binaries for the latest version in the [Releases][] tab above.
 
 GaGa doesn't need to be installed. It can run from any folder and doesn't
-write to the Windows registry. It's possible to run it from an usb stick
+write to the Windows registry, unless you turn on *Start with Windows*
+(one value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`,
+removed again when you turn it off). It's possible to run it from an usb stick
 provided the .NET Framework is available on the target machine.
 
 ## Where to find radio stations

@@ -8,6 +8,6 @@ using System.Reflection;
 
 [assembly: AssemblyTitle("GaGa Radio Player")]
 [assembly: AssemblyProduct("GaGa")]
-[assembly: AssemblyVersion("2016.02.02")]
-[assembly: AssemblyFileVersion("2016.02.02")]
+[assembly: AssemblyVersion("2026.11.13")]
+[assembly: AssemblyFileVersion("2026.11.13")]
 

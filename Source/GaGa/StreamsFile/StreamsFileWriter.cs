@@ -62,9 +62,10 @@ namespace GaGa.StreamsFile
 
         /// <summary>
         /// Add "name = uri" at the end of a section, creating the section
-        /// at the end of the file when it doesn't exist yet.
+        /// at the end of the file when it doesn't exist yet
+        /// (or before the first section, with newSectionFirst).
         /// </summary>
-        public static void AddStream(String filepath, String section, String name, Uri uri)
+        public static void AddStream(String filepath, String section, String name, Uri uri, Boolean newSectionFirst = false)
         {
             List<String> lines = new List<String>(ReadLines(filepath));
 
@@ -76,7 +77,14 @@ namespace GaGa.StreamsFile
             String header = "[" + section + "]";
 
             Int32 sectionLine = lines.FindIndex(l => l.Trim().Equals(header, StringComparison.OrdinalIgnoreCase));
-            if (sectionLine < 0)
+            Int32 firstSection = lines.FindIndex(l => l.Trim().StartsWith("[") && l.Trim().EndsWith("]"));
+
+            if (sectionLine < 0 && newSectionFirst && firstSection >= 0)
+            {
+                // keep any comments on top of the file above the new section:
+                lines.InsertRange(firstSection, new String[] { header, entry, "" });
+            }
+            else if (sectionLine < 0)
             {
                 if (lines.Count > 0)
                     lines.Add("");

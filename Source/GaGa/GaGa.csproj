@@ -69,9 +69,12 @@
     <Compile Include="StreamsFile\StreamsFileReadError.cs" />
     <Compile Include="StreamsFile\StreamsFileWriter.cs" />
     <Compile Include="StreamsFile\Util.cs" />
+    <Compile Include="Autostart.cs" />
     <Compile Include="GaGa.cs" />
+    <Compile Include="GaGaFeatures.cs" />
     <Compile Include="GaGaSettings.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="Updater.cs" />
     <Compile Include="Util.cs" />
   </ItemGroup>
   <ItemGroup>

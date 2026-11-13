@@ -48,6 +48,13 @@ namespace GaGa
         public Boolean OptionsEnableTrackNotificationsChecked;
 
         /// <summary>
+        /// Whether to look for a newer GaGa on startup.
+        /// Optional: settings files from older versions don't have it.
+        /// </summary>
+        [OptionalField]
+        public Boolean OptionsCheckForUpdatesChecked;
+
+        /// <summary>
         /// Stores program settings.
         /// </summary>
         public GaGaSettings()
@@ -58,6 +65,7 @@ namespace GaGa
             OptionsEnableAutoPlayChecked = false;
             OptionsEnableMultimediaKeysChecked = true;
             OptionsEnableTrackNotificationsChecked = true;
+            OptionsCheckForUpdatesChecked = true;
         }
 
         /// <summary>
@@ -67,6 +75,7 @@ namespace GaGa
         private void OnDeserializing(StreamingContext context)
         {
             OptionsEnableTrackNotificationsChecked = true;
+            OptionsCheckForUpdatesChecked = true;
         }
     }
 }

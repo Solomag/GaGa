@@ -79,6 +79,11 @@ namespace GaGa.NotifyIconPlayer
         public Uri LocalUri { get; private set; }
 
         /// <summary>
+        /// Records what this relay plays, on request.
+        /// </summary>
+        public readonly StreamRecorder Recorder = new StreamRecorder();
+
+        /// <summary>
         /// Last error while fetching the remote stream, if any.
         /// </summary>
         public String LastError
@@ -451,6 +456,7 @@ namespace GaGa.NotifyIconPlayer
                 {
                     OggFlacRemuxer remuxer = new OggFlacRemuxer(audio);
                     Boolean isFlac = remuxer.Start();
+                    String outputType = isFlac ? "audio/flac" : contentType;
 
                     WriteText(local,
                         "HTTP/1.0 200 OK\r\n" +
@@ -458,10 +464,13 @@ namespace GaGa.NotifyIconPlayer
                         "Cache-Control: no-cache\r\n" +
                         "Connection: close\r\n\r\n");
 
+                    // the first FLAC write is the header, which every recording needs:
+                    Stream output = new StreamRecorder.Tee(local, Recorder, outputType, isFlac);
+
                     if (isFlac)
-                        remuxer.CopyFlacTo(local, () => stopped, ReportTitle);
+                        remuxer.CopyFlacTo(output, () => stopped, ReportTitle);
                     else
-                        remuxer.CopyRawTo(local, () => stopped);
+                        remuxer.CopyRawTo(output, () => stopped);
                     return;
                 }
 
@@ -471,6 +480,8 @@ namespace GaGa.NotifyIconPlayer
                     "Cache-Control: no-cache\r\n" +
                     "Connection: close\r\n\r\n");
 
+                Stream tee = new StreamRecorder.Tee(local, Recorder, contentType, false);
+
                 Byte[] buffer = new Byte[16384];
                 while (!stopped)
                 {
@@ -478,7 +489,7 @@ namespace GaGa.NotifyIconPlayer
                     if (read <= 0)
                         break;
 
-                    local.Write(buffer, 0, read);
+                    tee.Write(buffer, 0, read);
                 }
             }
             catch (Exception e)
@@ -623,6 +634,7 @@ namespace GaGa.NotifyIconPlayer
         public void Dispose()
         {
             stopped = true;
+            Recorder.Stop();
             try
             {
                 listener.Stop();
