@@ -106,7 +106,99 @@ namespace GaGa.StreamsFile
                 lines.Insert(insertAt, entry);
             }
 
-            // write through a temporary file, so a crash can't leave half a file:
+            WriteLines(filepath, lines);
+        }
+
+        private static Boolean IsSectionHeader(String line)
+        {
+            String trimmed = line.Trim();
+            return trimmed.StartsWith("[") && trimmed.EndsWith("]");
+        }
+
+        /// <summary>
+        /// The address of a "name = uri" line, or null.
+        /// </summary>
+        private static Uri LineUri(String raw)
+        {
+            String line = raw.Trim();
+            if (line.StartsWith("#") || line.StartsWith(";") || line.StartsWith("["))
+                return null;
+
+            Int32 equals = line.IndexOf('=');
+            Uri uri;
+            if (equals < 0 || !Uri.TryCreate(line.Substring(equals + 1).Trim(), UriKind.Absolute, out uri))
+                return null;
+            return uri;
+        }
+
+        /// <summary>
+        /// Whether a given section (not its subsections) has a stream with this address.
+        /// </summary>
+        public static Boolean ContainsInSection(String filepath, String section, Uri uri)
+        {
+            String header = "[" + section + "]";
+            Boolean inside = false;
+
+            foreach (String raw in ReadLines(filepath))
+            {
+                if (IsSectionHeader(raw))
+                {
+                    inside = raw.Trim().Equals(header, StringComparison.OrdinalIgnoreCase);
+                    continue;
+                }
+
+                if (inside && LineUri(raw) == uri)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Remove the streams with this address from a section.
+        /// A section left without lines is removed too.
+        /// </summary>
+        public static void RemoveStream(String filepath, String section, Uri uri)
+        {
+            List<String> lines = new List<String>(ReadLines(filepath));
+            String header = "[" + section + "]";
+
+            Int32 start = lines.FindIndex(l => l.Trim().Equals(header, StringComparison.OrdinalIgnoreCase));
+            if (start < 0)
+                return;
+
+            Int32 end = start + 1;
+            while (end < lines.Count && !IsSectionHeader(lines[end]))
+                end++;
+
+            for (Int32 i = end - 1; i > start; i--)
+            {
+                if (LineUri(lines[i]) == uri)
+                {
+                    lines.RemoveAt(i);
+                    end--;
+                }
+            }
+
+            // nothing left but blank lines: drop the section and its blank lines
+            Boolean empty = true;
+            for (Int32 i = start + 1; i < end; i++)
+                if (lines[i].Trim().Length > 0)
+                    empty = false;
+
+            if (empty)
+                lines.RemoveRange(start, end - start);
+
+            while (lines.Count > 0 && lines[lines.Count - 1].Trim().Length == 0)
+                lines.RemoveAt(lines.Count - 1);
+
+            WriteLines(filepath, lines);
+        }
+
+        /// <summary>
+        /// Write the file through a temporary one, so a crash can't leave half a file.
+        /// </summary>
+        private static void WriteLines(String filepath, List<String> lines)
+        {
             String temporary = filepath + ".tmp";
             File.WriteAllText(temporary, String.Join("\r\n", lines.ToArray()) + "\r\n", new UTF8Encoding(true));
             if (!File.Exists(filepath))

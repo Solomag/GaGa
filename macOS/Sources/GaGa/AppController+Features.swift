@@ -20,10 +20,13 @@ extension AppController {
     /// Enable, check and label the items that depend on the player state.
     func updateItemStates() {
         let current = player.source
-        let known = current.map { StreamsFileWriter.contains(AppPaths.streams, stream: $0.url) } ?? false
+        let favorite = current.map {
+            StreamsFileWriter.containsInSection(AppPaths.streams, section: favoritesSection, stream: $0.url)
+        } ?? false
 
-        favoriteItem.isEnabled = current != nil && !known
-        favoriteItem.title = known ? "In Your Streams File" : "Add to Favorites"
+        favoriteItem.isEnabled = current != nil
+        favoriteItem.state = favorite ? .on : .off
+        favoriteItem.title = favorite ? "Remove from Favorites" : "Add to Favorites"
 
         let recording = player.recorder.isRecording
         recordToggleItem.isEnabled = recording || (!player.isIdle && isRecordable(player.streamURL))
@@ -49,13 +52,18 @@ extension AppController {
         guard let current = player.source else { return }
 
         do {
-            try StreamsFileWriter.addStream(
-                AppPaths.streams,
-                section: favoritesSection,
-                name: current.name,
-                stream: current.url,
-                newSectionFirst: true
-            )
+            // the station may also be in other sections; only Favorites counts here
+            if StreamsFileWriter.containsInSection(AppPaths.streams, section: favoritesSection, stream: current.url) {
+                try StreamsFileWriter.removeStream(AppPaths.streams, section: favoritesSection, stream: current.url)
+            } else {
+                try StreamsFileWriter.addStream(
+                    AppPaths.streams,
+                    section: favoritesSection,
+                    name: current.name,
+                    stream: current.url,
+                    newSectionFirst: true
+                )
+            }
         } catch {
             Alert.show(title: "Unable to add to favorites", message: error.localizedDescription)
         }

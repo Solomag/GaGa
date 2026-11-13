@@ -28,17 +28,18 @@ namespace GaGa
         {
             PlayerStream current = player.Source;
 
-            Boolean known = false;
+            Boolean favorite = false;
             try
             {
-                known = current != null && StreamsFileWriter.Contains(streamsFilepath, current.Uri);
+                favorite = current != null && StreamsFileWriter.ContainsInSection(streamsFilepath, FavoritesSection, current.Uri);
             }
             catch (Exception)
             {
             }
 
-            favoriteItem.Enabled = current != null && !known;
-            favoriteItem.Text = known ? "In your streams file" : "Add to &favorites";
+            favoriteItem.Enabled = current != null;
+            favoriteItem.Checked = favorite;
+            favoriteItem.Text = favorite ? "Remove from &favorites" : "Add to &favorites";
 
             Boolean recording = player.IsRecording;
             recordToggleItem.Enabled = recording || player.CanRecord;
@@ -93,8 +94,9 @@ namespace GaGa
         ///
 
         /// <summary>
-        /// Add the current station to the favorites section of the streams file,
-        /// on top of the menu. The menu picks it up on its own (the file is reloaded on changes).
+        /// Add the current station to the favorites section of the streams file
+        /// (on top of the menu), or remove it from there. The station may also be
+        /// in other sections. The menu picks it up on its own (the file is reloaded on changes).
         /// </summary>
         private void OnFavoriteItemClick(Object sender, EventArgs e)
         {
@@ -104,7 +106,10 @@ namespace GaGa
 
             try
             {
-                StreamsFileWriter.AddStream(streamsFilepath, FavoritesSection, current.Name, current.Uri, true);
+                if (StreamsFileWriter.ContainsInSection(streamsFilepath, FavoritesSection, current.Uri))
+                    StreamsFileWriter.RemoveStream(streamsFilepath, FavoritesSection, current.Uri);
+                else
+                    StreamsFileWriter.AddStream(streamsFilepath, FavoritesSection, current.Name, current.Uri, true);
             }
             catch (Exception exception)
             {

@@ -63,7 +63,8 @@ on the keyboard and in Control Center reach the app. No accessibility
 permission is needed. Toggle them in the Options submenu.
 
 **Favorites**: *Add to Favorites* puts the station you're listening to into
-a `[Favorites]` section of the streams file, which becomes the first submenu.
+a `[Favorites]` section of the streams file, which becomes the first submenu,
+even when it's already in another one. *Remove from Favorites* takes it out.
 
 **Recording**: *Recording > Record This Station* saves the stream into
 `~/Music/GaGa Recordings`, as received (MP3, AAC, Ogg...), with no

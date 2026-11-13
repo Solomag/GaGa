@@ -37,7 +37,8 @@ Issues and suggestions: https://github.com/Solomag/GaGa/issues
   right away or add a station to your streams file in one click.
 * **A checkmark on the station you're listening to**, and on the submenus that lead to it.
 * **Favorites.** *Add to favorites* puts the current station into a `[Favorites]`
-  submenu at the top of the menu (it's just a section of your streams file).
+  submenu at the top of the menu (it's just a section of your streams file),
+  even when it's already in another submenu. *Remove from favorites* takes it out again.
 * **Recording.** *Recording > Record this station* saves the stream as it
   plays (MP3, AAC or FLAC, no re-encoding) into a `Recordings` folder next to `GaGa.exe`.
 * **Start with Windows** (in *Options*), off by default.
