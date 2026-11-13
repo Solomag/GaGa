@@ -20,6 +20,7 @@ enum Updater {
     enum UpdateError: LocalizedError {
         case badArchive
         case notWritable(String)
+        case rateLimited
 
         var errorDescription: String? {
             switch self {
@@ -27,6 +28,8 @@ enum Updater {
                 return "The downloaded file doesn't contain GaGa.app."
             case .notWritable(let path):
                 return "GaGa can't replace itself in:\n\(path)"
+            case .rateLimited:
+                return "GitHub refused the request (too many requests), try again later."
             }
         }
     }
@@ -72,13 +75,51 @@ enum Updater {
     /// The latest release, when it is newer than us and has a macOS build.
     /// The completion runs on the main queue.
     static func check(completion: @escaping (Result<Update?, Error>) -> Void) {
+        checkWithAPI { result in
+            // the API allows 60 requests an hour per address:
+            if case .failure(UpdateError.rateLimited) = result {
+                checkWithRedirect(completion: completion)
+            } else {
+                completion(result)
+            }
+        }
+    }
+
+    /// Without the API: .../releases/latest redirects to .../releases/tag/TAG,
+    /// and the assets of a tag have fixed addresses.
+    private static func checkWithRedirect(completion: @escaping (Result<Update?, Error>) -> Void) {
+        let latest = URL(string: "https://github.com/Solomag/GaGa/releases/latest")!
+
+        URLSession.shared.dataTask(with: latest) { _, response, error in
+            let result: Result<Update?, Error> = Result {
+                if let error { throw error }
+
+                guard let url = response?.url, url.path.contains("/tag/") else { return nil }
+                let tag = url.lastPathComponent
+
+                guard isNewer(tag, than: currentVersion),
+                      let download = URL(string: "https://github.com/Solomag/GaGa/releases/download/\(tag)/GaGa-macOS-\(tag).zip")
+                else { return nil }
+
+                return Update(version: tag, page: url, download: download)
+            }
+
+            DispatchQueue.main.async { completion(result) }
+        }.resume()
+    }
+
+    private static func checkWithAPI(completion: @escaping (Result<Update?, Error>) -> Void) {
         var request = URLRequest(url: latestRelease, timeoutInterval: 15)
         request.setValue("GaGa updater", forHTTPHeaderField: "User-Agent")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
-        URLSession.shared.dataTask(with: request) { data, _, error in
+        URLSession.shared.dataTask(with: request) { data, response, error in
             let result: Result<Update?, Error> = Result {
                 if let error { throw error }
+
+                if let http = response as? HTTPURLResponse, http.statusCode == 403 || http.statusCode == 429 {
+                    throw UpdateError.rateLimited
+                }
 
                 let release = try JSONDecoder().decode(Release.self, from: data ?? Data())
 

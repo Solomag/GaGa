@@ -105,6 +105,57 @@ namespace GaGa
         /// </summary>
         public static Update Check()
         {
+            try
+            {
+                return CheckWithApi();
+            }
+            catch (WebException e)
+            {
+                // the API allows 60 requests an hour per address (403/429 after that):
+                HttpWebResponse response = e.Response as HttpWebResponse;
+                if (response == null || ((Int32) response.StatusCode != 403 && (Int32) response.StatusCode != 429))
+                    throw;
+            }
+
+            return CheckWithRedirect();
+        }
+
+        /// <summary>
+        /// Without the API: .../releases/latest redirects to .../releases/tag/TAG,
+        /// and the asset of a tag has a fixed address.
+        /// </summary>
+        private static Update CheckWithRedirect()
+        {
+            HttpWebRequest request = (HttpWebRequest) WebRequest.Create("https://github.com/Solomag/GaGa/releases/latest");
+            request.UserAgent = UserAgent;
+            request.Method = "HEAD";
+            request.AllowAutoRedirect = false;
+            request.Timeout = 15000;
+
+            String location;
+            using (WebResponse response = request.GetResponse())
+                location = response.Headers["Location"];
+
+            Int32 at = (location ?? "").LastIndexOf("/tag/", StringComparison.Ordinal);
+            if (at < 0)
+                return null;
+
+            String tag = Uri.UnescapeDataString(location.Substring(at + 5));
+            Version version = ParseTag(tag);
+            if (version == null || !IsNewer(version, CurrentVersion))
+                return null;
+
+            return new Update
+            {
+                Version = version,
+                Tag = tag,
+                PageUrl = location,
+                DownloadUri = new Uri("https://github.com/Solomag/GaGa/releases/download/" + Uri.EscapeDataString(tag) + "/" + AssetName),
+            };
+        }
+
+        private static Update CheckWithApi()
+        {
             HttpWebRequest request = (HttpWebRequest) WebRequest.Create(LatestReleaseUrl);
             request.UserAgent = UserAgent;
             request.Accept = "application/vnd.github+json";
