@@ -72,6 +72,12 @@ re-encoding. It opens a second connection to the station, because AVPlayer
 doesn't hand out the audio it plays. It stops with the stream. HLS stations
 (.m3u8) can't be recorded.
 
+**Recent Stations** (the last 15 played), **Track History** (the last 100
+titles the stations announced, with Copy and Search on the Web) and a
+**Sleep Timer** (15, 30, 60 or 120 minutes) are in the menu. A station that
+drops the connection is opened again by itself; one that keeps dropping, or
+never sends any audio, stops with the reason.
+
 **Start at Login** in Options registers the app as a login item
 (System Settings > General > Login Items).
 

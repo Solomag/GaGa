@@ -4,6 +4,13 @@
 
 import Foundation
 
+/// A track announced by a station.
+struct HistoryEntry: Codable {
+    let time: Date
+    let station: String
+    let title: String
+}
+
 /// Program settings, stored as JSON next to the streams file.
 struct Settings: Codable {
 
@@ -26,6 +33,12 @@ struct Settings: Codable {
     /// Whether to look for a newer GaGa on startup.
     var checkUpdates: Bool = true
 
+    /// Recently played stations, newest first.
+    var recent: [PlayerStream] = []
+
+    /// Track history, newest first.
+    var history: [HistoryEntry] = []
+
     init() {}
 
     /// Decode leniently, so that a file written by an older version
@@ -41,6 +54,8 @@ struct Settings: Codable {
         mediaKeys = try container.decodeIfPresent(Bool.self, forKey: .mediaKeys) ?? defaults.mediaKeys
         checkUpdates = try container.decodeIfPresent(Bool.self, forKey: .checkUpdates)
             ?? defaults.checkUpdates
+        recent = (try? container.decodeIfPresent([PlayerStream].self, forKey: .recent)) ?? []
+        history = (try? container.decodeIfPresent([HistoryEntry].self, forKey: .history)) ?? []
 
         volume = min(max(volume, 0), 1)
     }

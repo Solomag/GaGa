@@ -46,6 +46,15 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var checkNowItem = menuItem("Check for Updates Now", #selector(onCheckNowClicked))
     var updateCheckRunning = false
 
+    // recent stations, track history, sleep timer (see AppController+Extras):
+    lazy var recentItem = NSMenuItem(title: "Recent Stations", action: nil, keyEquivalent: "")
+    lazy var historyItem = NSMenuItem(title: "Track History", action: nil, keyEquivalent: "")
+    lazy var sleepItem = NSMenuItem(title: "Sleep Timer", action: nil, keyEquivalent: "")
+    var recent: [PlayerStream] = []
+    var history: [HistoryEntry] = []
+    var sleepTimer: Timer?
+    var sleepAt: Date?
+
     //
     // Startup and shutdown
     //
@@ -98,6 +107,12 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         power.setMonitoring(player.needsPowerWatch)
+
+        recent = settings.recent
+        history = settings.history
+
+        player.onStarted = { [weak self] stream in self?.addRecent(stream) }
+        player.onTitle = { [weak self] title in self?.addHistory(title) }
 
         player.recorder.onFailure = { message in
             Alert.show(title: "Recording stopped", message: message)
@@ -154,6 +169,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settings.autoPlay = autoPlayItem.state == .on
         settings.mediaKeys = mediaKeysItem.state == .on
         settings.checkUpdates = checkUpdatesItem.state == .on
+        settings.recent = recent
+        settings.history = history
 
         do {
             try settings.save(to: AppPaths.settings)
@@ -284,13 +301,17 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         editItem.isEnabled = canEdit
         updateItemStates()
+        updateExtrasMenus()
 
         menu.addItem(.separator())
         menu.addItem(showWindowItem)
         menu.addItem(editItem)
         menu.addItem(favoriteItem)
         menu.addItem(.separator())
+        menu.addItem(recentItem)
+        menu.addItem(historyItem)
         menu.addItem(recordingItem)
+        menu.addItem(sleepItem)
         menu.addItem(audioItem)
         menu.addItem(optionsItem)
         menu.addItem(.separator())

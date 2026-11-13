@@ -14,7 +14,7 @@ struct PlayerStream: Codable, Equatable {
 
 /// A media player that takes control of a status item image and tooltip
 /// to display status.
-final class Player: NSObject {
+final class Player: NSObject, AVPlayerItemMetadataOutputPushDelegate {
 
     private let statusItem: NSStatusItem
     private let player = AVPlayer()
@@ -27,6 +27,20 @@ final class Player: NSObject {
 
     /// Records the current stream on request. Stops with the stream.
     let recorder = StreamRecorder()
+
+    /// Called with the track title announced by the stream (ICY StreamTitle,
+    /// ID3 or other timed metadata), on the main queue.
+    var onTitle: ((String) -> Void)?
+
+    /// Called when a station is started by hand (not by a reconnection).
+    var onStarted: ((PlayerStream) -> Void)?
+
+    // reconnecting after drops, and giving up on dead stations:
+    private var drops: [Date] = []
+    private var silentAttempts = 0
+    private var hadAudio = false
+    private var reconnecting = false
+    private var lastTitle: String?
 
     /// Bumped on every play/stop, so that a playlist resolution or a
     /// player event belonging to a previous stream is ignored.
@@ -147,6 +161,14 @@ final class Player: NSObject {
         // playing again by hand cancels any pending automatic resume:
         isSuspended = false
         generation += 1
+
+        if !reconnecting {
+            drops = []
+            silentAttempts = 0
+            hadAudio = false
+            lastTitle = nil
+        }
+        reconnecting = false
         let token = generation
 
         // silence whatever is playing right now: resolving a playlist takes
@@ -180,6 +202,7 @@ final class Player: NSObject {
     /// Set a given stream as current and play it. Unmutes the player.
     func play(_ stream: PlayerStream) {
         source = stream
+        onStarted?(stream)
         play()
     }
 
@@ -253,11 +276,16 @@ final class Player: NSObject {
         streamURL = url
         let item = AVPlayerItem(url: url)
 
+        // track titles sent inside the stream:
+        let metadata = AVPlayerItemMetadataOutput(identifiers: nil)
+        metadata.setDelegate(self, queue: .main)
+        item.add(metadata)
+
         itemStatusObservation = item.observe(\.status, options: [.new]) {
             [weak self] item, _ in
             DispatchQueue.main.async {
                 guard let self, self.generation == token, item.status == .failed else { return }
-                self.fail(item.error?.localizedDescription ?? "Unknown playback error.")
+                self.retryOrFail(item.error?.localizedDescription ?? "Unknown playback error.")
             }
         }
 
@@ -320,6 +348,8 @@ final class Player: NSObject {
             startBufferingAnimation()
             updateIcon()
         case .playing:
+            hadAudio = true
+            silentAttempts = 0
             stopBufferingAnimation()
             updateIcon()
         default:
@@ -329,14 +359,70 @@ final class Player: NSObject {
 
     @objc private func onItemDidPlayToEnd(_ notification: Notification) {
         guard notification.object as AnyObject === player.currentItem else { return }
-        stop()
+
+        // a live stream doesn't end: the station dropped the connection
+        retryOrFail("The station closed the connection.")
     }
 
     @objc private func onItemFailedToPlayToEnd(_ notification: Notification) {
         guard notification.object as AnyObject === player.currentItem else { return }
 
         let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
-        fail(error?.localizedDescription ?? "The stream stopped unexpectedly.")
+        retryOrFail(error?.localizedDescription ?? "The stream stopped unexpectedly.")
+    }
+
+    /// The station dropped or failed: connect again after a moment, unless
+    /// it keeps dropping (more than 5 times a minute) or never sent any audio
+    /// (3 attempts), then stop and report why.
+    private func retryOrFail(_ message: String) {
+        guard !isIdle else { return }
+
+        let now = Date()
+        drops = drops.filter { now.timeIntervalSince($0) < 60 }
+        drops.append(now)
+
+        if !hadAudio {
+            silentAttempts += 1
+        }
+
+        if drops.count > 5 || silentAttempts >= 3 {
+            fail(message)
+            return
+        }
+
+        let token = generation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            guard let self, self.generation == token, !self.isIdle else { return }
+            self.reconnecting = true
+            self.play()
+        }
+    }
+
+    //
+    // Track titles
+    //
+
+    func metadataOutput(
+        _ output: AVPlayerItemMetadataOutput,
+        didOutputTimedMetadataGroups groups: [AVTimedMetadataGroup],
+        from track: AVPlayerItemTrack?
+    ) {
+        for group in groups {
+            for item in group.items {
+                let key = (item.identifier?.rawValue ?? item.key.map { "\($0)" } ?? "").lowercased()
+
+                guard key.contains("title"),
+                      let value = item.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !value.isEmpty
+                else { continue }
+
+                if value != lastTitle {
+                    lastTitle = value
+                    onTitle?(value)
+                }
+                return
+            }
+        }
     }
 
     //
