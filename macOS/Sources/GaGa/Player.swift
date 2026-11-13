@@ -22,6 +22,12 @@ final class Player: NSObject {
     private(set) var source: PlayerStream?
     private(set) var isIdle = true
 
+    /// The address actually playing, after unwrapping playlists.
+    private(set) var streamURL: URL?
+
+    /// Records the current stream on request. Stops with the stream.
+    let recorder = StreamRecorder()
+
     /// Bumped on every play/stop, so that a playlist resolution or a
     /// player event belonging to a previous stream is ignored.
     private var generation = 0
@@ -149,6 +155,8 @@ final class Player: NSObject {
         player.pause()
         player.replaceCurrentItem(with: nil)
         itemStatusObservation = nil
+        recorder.stop()
+        streamURL = nil
 
         isIdle = false
         player.isMuted = false
@@ -194,6 +202,8 @@ final class Player: NSObject {
         player.isMuted = false
 
         itemStatusObservation = nil
+        recorder.stop()
+        streamURL = nil
         stopBufferingAnimation()
 
         isIdle = true
@@ -240,6 +250,7 @@ final class Player: NSObject {
     }
 
     private func startPlaying(_ url: URL, token: Int) {
+        streamURL = url
         let item = AVPlayerItem(url: url)
 
         itemStatusObservation = item.observe(\.status, options: [.new]) {

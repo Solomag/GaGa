@@ -3,6 +3,7 @@
 // A minimal radio player for the macOS menu bar.
 
 import AppKit
+import ServiceManagement
 
 final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
@@ -11,7 +12,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var settings = Settings()
     private let loader = StreamsFileLoader(filePath: AppPaths.streams.path)
-    private lazy var player = Player(statusItem: statusItem)
+    lazy var player = Player(statusItem: statusItem)
     private let power = PowerWatcher()
     private var windowController: MainWindowController?
 
@@ -21,6 +22,15 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // constant menu items:
     private lazy var showWindowItem = menuItem("Open GaGa Window", #selector(onShowWindowClicked))
     private lazy var editItem = menuItem("Edit Streams File", #selector(onEditClicked))
+    lazy var favoriteItem = menuItem("Add to Favorites", #selector(onFavoriteClicked))
+
+    // recording submenu:
+    lazy var recordingItem = NSMenuItem(title: "Recording", action: nil, keyEquivalent: "")
+    lazy var recordToggleItem = menuItem("Record This Station", #selector(onRecordClicked))
+    lazy var recordFolderItem = menuItem("Show Recordings in Finder", #selector(onRecordFolderClicked))
+
+    /// Section of the streams file that "Add to Favorites" writes to.
+    let favoritesSection = "Favorites"
     private lazy var quitItem = menuItem("Quit GaGa", #selector(onQuitClicked), key: "q")
 
     // audio submenu:
@@ -31,6 +41,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var optionsItem = NSMenuItem(title: "Options", action: nil, keyEquivalent: "")
     private lazy var autoPlayItem = menuItem("Play on Startup", #selector(onAutoPlayClicked))
     private lazy var mediaKeysItem = menuItem("Enable Media Keys", #selector(onMediaKeysClicked))
+    lazy var loginItem = menuItem("Start at Login", #selector(onLoginItemClicked))
+    lazy var checkUpdatesItem = menuItem("Check for Updates on Startup", #selector(onCheckUpdatesClicked))
+    private lazy var checkNowItem = menuItem("Check for Updates Now", #selector(onCheckNowClicked))
+    var updateCheckRunning = false
 
     //
     // Startup and shutdown
@@ -44,6 +58,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         buildMainMenu()
         buildAudioMenu()
+        buildRecordingMenu()
         buildOptionsMenu()
 
         statusItem.button?.action = #selector(onStatusItemClicked)
@@ -57,6 +72,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         autoPlayItem.state = settings.autoPlay ? .on : .off
         mediaKeysItem.state = settings.mediaKeys ? .on : .off
+        checkUpdatesItem.state = settings.checkUpdates ? .on : .off
         player.setMediaKeysEnabled(settings.mediaKeys)
 
         let window = MainWindowController(player: player) { [weak self] in
@@ -82,6 +98,17 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         power.setMonitoring(player.needsPowerWatch)
+
+        player.recorder.onFailure = { message in
+            Alert.show(title: "Recording stopped", message: message)
+        }
+
+        // a bit after startup, the network may not be up yet when starting at login:
+        if settings.checkUpdates {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
+                self?.checkForUpdates(interactive: false)
+            }
+        }
     }
 
     /// Closing the window leaves the app in the menu bar.
@@ -126,6 +153,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settings.lastStream = player.source
         settings.autoPlay = autoPlayItem.state == .on
         settings.mediaKeys = mediaKeysItem.state == .on
+        settings.checkUpdates = checkUpdatesItem.state == .on
 
         do {
             try settings.save(to: AppPaths.settings)
@@ -214,6 +242,10 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         submenu.autoenablesItems = false
         submenu.addItem(autoPlayItem)
         submenu.addItem(mediaKeysItem)
+        submenu.addItem(loginItem)
+        submenu.addItem(.separator())
+        submenu.addItem(checkUpdatesItem)
+        submenu.addItem(checkNowItem)
 
         optionsItem.submenu = submenu
     }
@@ -251,11 +283,14 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         editItem.isEnabled = canEdit
+        updateItemStates()
 
         menu.addItem(.separator())
         menu.addItem(showWindowItem)
         menu.addItem(editItem)
+        menu.addItem(favoriteItem)
         menu.addItem(.separator())
+        menu.addItem(recordingItem)
         menu.addItem(audioItem)
         menu.addItem(optionsItem)
         menu.addItem(.separator())

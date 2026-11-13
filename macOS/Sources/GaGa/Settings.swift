@@ -23,6 +23,9 @@ struct Settings: Codable {
     /// Whether the media keys are enabled.
     var mediaKeys: Bool = true
 
+    /// Whether to look for a newer GaGa on startup.
+    var checkUpdates: Bool = true
+
     init() {}
 
     /// Decode leniently, so that a file written by an older version
@@ -36,6 +39,8 @@ struct Settings: Codable {
             ?? defaults.lastStream
         autoPlay = try container.decodeIfPresent(Bool.self, forKey: .autoPlay) ?? defaults.autoPlay
         mediaKeys = try container.decodeIfPresent(Bool.self, forKey: .mediaKeys) ?? defaults.mediaKeys
+        checkUpdates = try container.decodeIfPresent(Bool.self, forKey: .checkUpdates)
+            ?? defaults.checkUpdates
 
         volume = min(max(volume, 0), 1)
     }

@@ -19,6 +19,11 @@ enum AppPaths {
     static let settings = folder.appendingPathComponent("Settings.json")
     static let streams = folder.appendingPathComponent("Streams.ini")
 
+    /// Where recordings go: ~/Music/GaGa Recordings.
+    static let recordings: URL = FileManager.default
+        .urls(for: .musicDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("GaGa Recordings", isDirectory: true)
+
     /// The stream played by default on a fresh install: a local playlist
     /// in iCloud Drive, so that editing it there changes what plays.
     static let defaultStream = FileManager.default.homeDirectoryForCurrentUser

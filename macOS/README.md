@@ -62,6 +62,23 @@ would with nothing playing.
 on the keyboard and in Control Center reach the app. No accessibility
 permission is needed. Toggle them in the Options submenu.
 
+**Favorites**: *Add to Favorites* puts the station you're listening to into
+a `[Favorites]` section of the streams file, which becomes the first submenu.
+
+**Recording**: *Recording > Record This Station* saves the stream into
+`~/Music/GaGa Recordings`, as received (MP3, AAC, Ogg...), with no
+re-encoding. It opens a second connection to the station, because AVPlayer
+doesn't hand out the audio it plays. It stops with the stream. HLS stations
+(.m3u8) can't be recorded.
+
+**Start at Login** in Options registers the app as a login item
+(System Settings > General > Login Items).
+
+**Updates**: GaGa checks the [releases](https://github.com/Solomag/GaGa/releases)
+a few seconds after startup (can be turned off in Options) and, if you
+agree, downloads the new version, replaces itself and restarts. This needs
+GaGa.app in a folder you can write to, such as /Applications.
+
 ## The streams file
 
 `~/Library/Application Support/GaGa/Streams.ini`, recreated with defaults
