@@ -124,6 +124,40 @@ namespace GaGa.Controls
         }
 
         /// <summary>
+        /// List headers keep their light look (and dark text) whatever the
+        /// colors, so in dark mode they are drawn here; the rows as usual.
+        /// </summary>
+        private static void ApplyListView(ListView list, Boolean dark)
+        {
+            if (!(list.Tag is String && (String) list.Tag == "themed"))
+            {
+                list.Tag = "themed";
+                list.DrawColumnHeader += OnDrawColumnHeader;
+                list.DrawItem += (s, e) => e.DrawDefault = true;
+                list.DrawSubItem += (s, e) => e.DrawDefault = true;
+            }
+
+            list.OwnerDraw = dark;
+            list.Invalidate();
+        }
+
+        private static void OnDrawColumnHeader(Object sender, DrawListViewColumnHeaderEventArgs e)
+        {
+            using (SolidBrush back = new SolidBrush(DarkBack))
+                e.Graphics.FillRectangle(back, e.Bounds);
+
+            using (Pen line = new Pen(DarkBorder))
+            {
+                e.Graphics.DrawLine(line, e.Bounds.Right - 1, e.Bounds.Top + 3, e.Bounds.Right - 1, e.Bounds.Bottom - 4);
+                e.Graphics.DrawLine(line, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+            }
+
+            Rectangle text = new Rectangle(e.Bounds.X + 6, e.Bounds.Y, e.Bounds.Width - 10, e.Bounds.Height);
+            TextRenderer.DrawText(e.Graphics, e.Header.Text, e.Font, text, DarkText,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        }
+
+        /// <summary>
         /// Colors for a window and everything in it.
         /// </summary>
         public static void Apply(Control control)
@@ -139,6 +173,14 @@ namespace GaGa.Controls
             {
                 control.BackColor = dark ? DarkControl : SystemColors.Window;
                 control.ForeColor = dark ? DarkText : SystemColors.WindowText;
+
+                // the themed (3D) borders and combo boxes ignore BackColor:
+                if (control is TextBox)
+                    ((TextBox) control).BorderStyle = dark ? BorderStyle.FixedSingle : BorderStyle.Fixed3D;
+                if (control is ComboBox)
+                    ((ComboBox) control).FlatStyle = dark ? FlatStyle.Flat : FlatStyle.Standard;
+                if (control is ListView)
+                    ApplyListView((ListView) control, dark);
 
                 if (control.IsHandleCreated)
                     ApplyNativeTheme(control);
