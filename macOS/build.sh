@@ -9,7 +9,7 @@ set -e
 cd "$(dirname "$0")"
 
 NAME="GaGa"
-VERSION="${GAGA_VERSION:-2026.11.14}"
+VERSION="${GAGA_VERSION:-2026.11.16}"
 BUNDLE_ID="com.github.thekingziga.gaga"
 APP="build/$NAME.app"
 
