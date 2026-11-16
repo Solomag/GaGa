@@ -232,31 +232,97 @@ namespace GaGa.Search
             String query = "/json/stations/search?" + parameter + "=" + Uri.EscapeDataString(term.Trim())
                          + "&hidebroken=true&order=clickcount&reverse=true&limit=500";
 
+            return Playable(WithMirrors(server => GetJson<List<RadioStation>>(new Uri("https://" + server + query), 20000)));
+        }
+
+        /// <summary>
+        /// Every station of a country (two-letter code), most popular first.
+        /// Blocking: call from a background thread.
+        /// </summary>
+        public static List<RadioStation> ByCountry(String code)
+        {
+            String query = "/json/stations/search?countrycode=" + Uri.EscapeDataString(code)
+                         + "&hidebroken=true&order=clickcount&reverse=true&limit=10000";
+
+            return Playable(WithMirrors(server => GetJson<List<RadioStation>>(new Uri("https://" + server + query), 30000)));
+        }
+
+        [DataContract]
+        internal class Country
+        {
+            [DataMember(Name = "name")] public String Name;
+            [DataMember(Name = "iso_3166_1")] public String Code;
+            [DataMember(Name = "stationcount")] public Int32 StationCount;
+
+            public override String ToString()
+            {
+                return Name + "  (" + StationCount + ")";
+            }
+        }
+
+        private static List<Country> countries;
+
+        /// <summary>
+        /// Countries that have stations, by name (asked once per run).
+        /// Blocking: call from a background thread.
+        /// </summary>
+        public static List<Country> Countries()
+        {
+            List<Country> cached = countries;
+            if (cached != null)
+                return cached;
+
+            List<Country> list = WithMirrors(server => GetJson<List<Country>>(
+                new Uri("https://" + server + "/json/countries?hidebroken=true&order=name"), 20000));
+
+            List<Country> result = new List<Country>();
+            foreach (Country country in list)
+            {
+                if (country.StationCount > 0 && !String.IsNullOrEmpty(country.Name)
+                    && !String.IsNullOrEmpty(country.Code) && country.Code.Length == 2)
+                    result.Add(country);
+            }
+
+            result.Sort((a, b) => String.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
+            countries = result;
+            return result;
+        }
+
+        /// <summary>
+        /// Ask one mirror, then others when it fails.
+        /// </summary>
+        private static T WithMirrors<T>(Func<String, T> ask)
+        {
             Exception lastError = null;
             for (Int32 attempt = 0; attempt < 3; attempt++)
             {
                 try
                 {
-                    List<RadioStation> stations = GetJson<List<RadioStation>>(new Uri("https://" + NextServer() + query), 20000);
-
-                    List<RadioStation> playable = new List<RadioStation>();
-                    foreach (RadioStation station in stations)
-                    {
-                        if (station.StreamUri != null && !String.IsNullOrEmpty(station.Name) && IsPlayableCodec(station.Codec))
-                        {
-                            station.Name = station.Name.Trim();
-                            playable.Add(station);
-                        }
-                    }
-                    return playable;
+                    return ask(NextServer());
                 }
                 catch (Exception e)
                 {
-                    // try another mirror:
                     lastError = e;
                 }
             }
             throw lastError;
+        }
+
+        /// <summary>
+        /// Leave out what can't be played or has no name.
+        /// </summary>
+        private static List<RadioStation> Playable(List<RadioStation> stations)
+        {
+            List<RadioStation> playable = new List<RadioStation>();
+            foreach (RadioStation station in stations)
+            {
+                if (station.StreamUri != null && !String.IsNullOrEmpty(station.Name) && IsPlayableCodec(station.Codec))
+                {
+                    station.Name = station.Name.Trim();
+                    playable.Add(station);
+                }
+            }
+            return playable;
         }
 
         /// <summary>

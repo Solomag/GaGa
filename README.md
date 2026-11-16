@@ -36,6 +36,9 @@ Issues and suggestions: https://github.com/Solomag/GaGa/issues
   [radio-browser.info][] directory (by name, genre or country). You can listen
   right away or add a station to your streams file in one click. The selected
   station shows what it is playing right now.
+  *Browse a country* lists every station of a country, tags or not, and the
+  *Filter the list* box narrows down what is loaded as you type; click a column
+  header to sort.
 * **A checkmark on the station you're listening to**, and on the submenus that lead to it.
 * **Favorites.** *Add to favorites* puts the current station into a `[Favorites]`
   submenu at the top of the menu (it's just a section of your streams file),

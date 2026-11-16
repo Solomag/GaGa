@@ -105,6 +105,15 @@ namespace GaGa
         public Int32 VolumeStep;
 
         /// <summary>
+        /// Search window: last mode and browsed country code.
+        /// </summary>
+        [OptionalField]
+        public Int32 SearchMode;
+
+        [OptionalField]
+        public String SearchCountry;
+
+        /// <summary>
         /// Stores program settings.
         /// </summary>
         public GaGaSettings()

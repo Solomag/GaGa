@@ -273,6 +273,8 @@ namespace GaGa
             optionsEnableTrackNotificationsItem.Checked = settings.OptionsEnableTrackNotificationsChecked;
             optionsCheckUpdatesItem.Checked = settings.OptionsCheckForUpdatesChecked;
             recordM4aItem.Checked = !settings.RecordingKeepRawAac;
+            SearchDialog.LastMode = settings.SearchMode;
+            SearchDialog.LastCountry = settings.SearchCountry;
             if (Array.IndexOf(VolumeSteps, settings.VolumeStep) >= 0)
                 volumeStep = settings.VolumeStep;
             if (settings.SearchWindowWidth > 0 && settings.SearchWindowHeight > 0)
@@ -997,6 +999,8 @@ namespace GaGa
             settings.OptionsTheme = (Int32) Theme.Mode;
             settings.RecordingKeepRawAac = !recordM4aItem.Checked;
             settings.VolumeStep = volumeStep;
+            settings.SearchMode = SearchDialog.LastMode;
+            settings.SearchCountry = SearchDialog.LastCountry;
             settings.SearchWindowWidth = SearchDialog.LastSize.Width;
             settings.SearchWindowHeight = SearchDialog.LastSize.Height;
             ExtrasSave();

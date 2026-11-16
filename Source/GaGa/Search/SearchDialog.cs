@@ -29,6 +29,9 @@ namespace GaGa.Search
         private readonly String streamsFilepath;
 
         private readonly TextBox queryTextBox;
+        private readonly ComboBox countryComboBox;
+        private readonly TextBox filterTextBox;
+        private readonly System.Windows.Forms.Timer filterTimer;
         private readonly ComboBox fieldComboBox;
         private readonly Button searchButton;
         private readonly ListView resultsListView;
@@ -48,6 +51,22 @@ namespace GaGa.Search
         /// Window size, kept between openings (and saved in the settings by GaGa).
         /// </summary>
         public static Size LastSize = Size.Empty;
+
+        /// <summary>
+        /// Last search mode and browsed country (two letters), kept like LastSize.
+        /// </summary>
+        public static Int32 LastMode;
+        public static String LastCountry;
+
+        // modes in the "by" box:
+        private const Int32 ModeName = 0, ModeGenre = 1, ModeCountry = 2, ModeBrowseCountry = 3;
+
+        // what was loaded (in the directory's order: most popular first),
+        // and the part of it the filter lets through, as shown:
+        private List<RadioStation> loaded = new List<RadioStation>();
+        private List<RadioStation> shown = new List<RadioStation>();
+        private Int32 sortColumn = -1;
+        private Boolean sortDescending;
 
         // results of an older search that finish late are ignored:
         private Int32 searchNumber;
@@ -83,15 +102,29 @@ namespace GaGa.Search
             top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
+            // the query box, or the country list when browsing a country, in the same place:
+            Panel queryPanel = new Panel();
+            queryPanel.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            queryPanel.Margin = new Padding(0, 0, 6, 0);
+
             queryTextBox = new TextBox();
-            queryTextBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-            queryTextBox.Margin = new Padding(0, 0, 6, 0);
+            queryTextBox.Dock = DockStyle.Fill;
+
+            countryComboBox = new ComboBox();
+            countryComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            countryComboBox.Dock = DockStyle.Fill;
+            countryComboBox.MaxDropDownItems = 25;
+            countryComboBox.Visible = false;
+
+            queryPanel.Controls.Add(queryTextBox);
+            queryPanel.Controls.Add(countryComboBox);
+            queryPanel.Height = Math.Max(queryTextBox.PreferredHeight, countryComboBox.PreferredHeight);
 
             fieldComboBox = new ComboBox();
             fieldComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            fieldComboBox.Items.AddRange(new Object[] { "by name", "by genre", "by country" });
+            fieldComboBox.Items.AddRange(new Object[] { "by name", "by genre", "by country", "browse a country" });
             fieldComboBox.SelectedIndex = 0;
-            fieldComboBox.Width = 120;
+            fieldComboBox.Width = 130;
             fieldComboBox.Anchor = AnchorStyles.Left;
             fieldComboBox.Margin = new Padding(0, 0, 6, 0);
 
@@ -101,7 +134,7 @@ namespace GaGa.Search
             searchButton.Anchor = AnchorStyles.Left;
             searchButton.Margin = new Padding(0);
 
-            top.Controls.Add(queryTextBox, 0, 0);
+            top.Controls.Add(queryPanel, 0, 0);
             top.Controls.Add(fieldComboBox, 1, 0);
             top.Controls.Add(searchButton, 2, 0);
 
@@ -112,6 +145,42 @@ namespace GaGa.Search
             resultsListView.FullRowSelect = true;
             resultsListView.HideSelection = false;
             resultsListView.MultiSelect = false;
+            resultsListView.ShowItemToolTips = true;
+
+            // virtual: only the visible rows exist, so the whole directory (tens
+            // of thousands of stations) scrolls and filters without delay:
+            resultsListView.VirtualMode = true;
+            resultsListView.VirtualListSize = 0;
+            resultsListView.RetrieveVirtualItem += OnRetrieveItem;
+            resultsListView.ColumnClick += OnColumnClick;
+
+            // filter row: what is loaded, narrowed down as you type:
+            TableLayoutPanel filterRow = new TableLayoutPanel();
+            filterRow.Dock = DockStyle.Top;
+            filterRow.AutoSize = true;
+            filterRow.ColumnCount = 2;
+            filterRow.RowCount = 1;
+            filterRow.Padding = new Padding(8, 0, 8, 0);
+            filterRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            filterRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+            Label filterLabel = new Label();
+            filterLabel.Text = "Filter the list:";
+            filterLabel.AutoSize = true;
+            filterLabel.Anchor = AnchorStyles.Left;
+            filterLabel.Margin = new Padding(0, 0, 6, 0);
+
+            filterTextBox = new TextBox();
+            filterTextBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            filterTextBox.Margin = new Padding(0);
+
+            filterRow.Controls.Add(filterLabel, 0, 0);
+            filterRow.Controls.Add(filterTextBox, 1, 0);
+
+            filterTimer = new System.Windows.Forms.Timer();
+            filterTimer.Interval = 200;
+            filterTimer.Tick += (sender, e) => { filterTimer.Stop(); ApplyFilter(); };
+            filterTextBox.TextChanged += (sender, e) => { filterTimer.Stop(); filterTimer.Start(); };
             resultsListView.Columns.Add("Station", 280);
             resultsListView.Columns.Add("Country", 110);
             resultsListView.Columns.Add("Format", 90);
@@ -181,6 +250,7 @@ namespace GaGa.Search
 
             // fill must be added first to be laid out last:
             Controls.Add(middle);
+            Controls.Add(filterRow);
             Controls.Add(top);
             Controls.Add(nowLabel);
             Controls.Add(bottom);
@@ -194,7 +264,12 @@ namespace GaGa.Search
             closeButton.Click += (sender, e) => Close();
             resultsListView.ItemActivate += OnPlayClick;
             resultsListView.SelectedIndexChanged += (sender, e) => { UpdateButtons(); NowScheduleLookUp(); };
-            FormClosed += (sender, e) => { nowNumber++; nowTimer.Dispose(); };
+            fieldComboBox.SelectedIndexChanged += (sender, e) => ModeChanged();
+            countryComboBox.SelectionChangeCommitted += (sender, e) => OnSearchClick(sender, e);
+            FormClosed += (sender, e) => { nowNumber++; nowTimer.Dispose(); filterTimer.Dispose(); };
+
+            if (LastMode >= 0 && LastMode < fieldComboBox.Items.Count)
+                fieldComboBox.SelectedIndex = LastMode;
             ResizeEnd += (sender, e) => { if (WindowState == FormWindowState.Normal) LastSize = Size; };
 
             UpdateButtons();
@@ -235,7 +310,7 @@ namespace GaGa.Search
                 ShowScrollBar(resultsListView.Handle, 0 /* SB_HORZ */, false);
 
             // the vertical scrollbar shows up after the items: fit again then
-            if (resultsListView.Items.Count > 0 && !refitting)
+            if (resultsListView.VirtualListSize > 0 && !refitting)
             {
                 refitting = true;
                 BeginInvoke(new Action(() => { ColumnsFit(); refitting = false; }));
@@ -332,9 +407,11 @@ namespace GaGa.Search
         {
             get
             {
-                if (resultsListView.SelectedItems.Count == 0)
+                if (resultsListView.SelectedIndices.Count == 0)
                     return null;
-                return (RadioStation) resultsListView.SelectedItems[0].Tag;
+
+                Int32 index = resultsListView.SelectedIndices[0];
+                return (index < shown.Count) ? shown[index] : null;
             }
         }
 
@@ -349,8 +426,107 @@ namespace GaGa.Search
         /// Searching
         ///
 
+        private Int32 Mode
+        {
+            get { return fieldComboBox.SelectedIndex; }
+        }
+
+        /// <summary>
+        /// The "by" box changed: a country list instead of the query box when browsing.
+        /// </summary>
+        private void ModeChanged()
+        {
+            LastMode = Mode;
+            Boolean browsing = Mode == ModeBrowseCountry;
+
+            countryComboBox.Visible = browsing;
+            queryTextBox.Visible = !browsing;
+            searchButton.Text = (Mode == ModeName || Mode == ModeGenre || Mode == ModeCountry) ? "&Search" : "&Load";
+
+            if (browsing)
+            {
+                if (countryComboBox.Items.Count == 0)
+                    LoadCountries();
+                else
+                    countryComboBox.Focus();
+            }
+            else
+            {
+                queryTextBox.Focus();
+            }
+        }
+
+        private void LoadCountries()
+        {
+            statusLabel.Text = "Getting the list of countries...";
+
+            ThreadPool.QueueUserWorkItem(state =>
+            {
+                List<RadioBrowser.Country> list = null;
+                String error = null;
+                try
+                {
+                    list = RadioBrowser.Countries();
+                }
+                catch (Exception exception)
+                {
+                    error = exception.Message;
+                }
+
+                OnUiThread(() =>
+                {
+                    if (error != null)
+                    {
+                        statusLabel.Text = "Unable to get the countries: " + error;
+                        return;
+                    }
+
+                    countryComboBox.BeginUpdate();
+                    countryComboBox.Items.Clear();
+                    foreach (RadioBrowser.Country country in list)
+                    {
+                        countryComboBox.Items.Add(country);
+                        if (country.Code == LastCountry)
+                            countryComboBox.SelectedItem = country;
+                    }
+                    countryComboBox.EndUpdate();
+
+                    statusLabel.Text = "Pick a country to see all its stations (type its first letters to jump).";
+                    countryComboBox.Focus();
+                });
+            });
+        }
+
+        private void OnUiThread(Action action)
+        {
+            try
+            {
+                if (!IsDisposed)
+                    BeginInvoke(action);
+            }
+            catch (InvalidOperationException)
+            {
+                // closed meanwhile
+            }
+        }
+
         private void OnSearchClick(Object sender, EventArgs e)
         {
+            if (Mode == ModeBrowseCountry)
+            {
+                RadioBrowser.Country country = countryComboBox.SelectedItem as RadioBrowser.Country;
+                if (country == null)
+                {
+                    statusLabel.Text = "Pick a country first.";
+                    return;
+                }
+
+                LastCountry = country.Code;
+                String code = country.Code;
+                Load("Loading the stations of " + country.Name + "...", () => RadioBrowser.ByCountry(code), null);
+                return;
+            }
+
             String term = queryTextBox.Text.Trim();
             if (term.Length == 0)
             {
@@ -359,12 +535,20 @@ namespace GaGa.Search
                 return;
             }
 
-            RadioSearchField field = (fieldComboBox.SelectedIndex == 1) ? RadioSearchField.Tag
-                                   : (fieldComboBox.SelectedIndex == 2) ? RadioSearchField.Country
+            RadioSearchField field = (Mode == ModeGenre) ? RadioSearchField.Tag
+                                   : (Mode == ModeCountry) ? RadioSearchField.Country
                                    : RadioSearchField.Name;
 
+            Load("Searching...", () => RadioBrowser.Search(field, term), null);
+        }
+
+        /// <summary>
+        /// Fetch stations in the background, then show them.
+        /// </summary>
+        private void Load(String status, Func<List<RadioStation>> fetch, Func<String> note)
+        {
             Int32 number = ++searchNumber;
-            statusLabel.Text = "Searching...";
+            statusLabel.Text = status;
             searchButton.Enabled = false;
             UseWaitCursor = true;
 
@@ -374,26 +558,19 @@ namespace GaGa.Search
                 String error = null;
                 try
                 {
-                    stations = RadioBrowser.Search(field, term);
+                    stations = fetch();
                 }
                 catch (Exception exception)
                 {
                     error = exception.Message;
                 }
 
-                try
-                {
-                    if (!IsDisposed)
-                        BeginInvoke(new Action(() => ShowResults(number, stations, error)));
-                }
-                catch (InvalidOperationException)
-                {
-                    // closed meanwhile
-                }
+                String extra = (error == null && note != null) ? note() : "";
+                OnUiThread(() => ShowResults(number, stations, error, extra));
             });
         }
 
-        private void ShowResults(Int32 number, List<RadioStation> stations, String error)
+        private void ShowResults(Int32 number, List<RadioStation> stations, String error, String extra)
         {
             if (number != searchNumber || IsDisposed)
                 return;
@@ -407,31 +584,140 @@ namespace GaGa.Search
                 return;
             }
 
-            resultsListView.BeginUpdate();
-            resultsListView.Items.Clear();
-            foreach (RadioStation station in stations)
-            {
-                ListViewItem item = new ListViewItem(station.Name);
-                item.SubItems.Add(station.Country ?? "");
-                item.SubItems.Add(station.Format);
-                item.SubItems.Add((station.Tags ?? "").Replace(",", ", "));
-                item.ToolTipText = station.StreamUri.AbsoluteUri;
-                item.Tag = station;
-                resultsListView.Items.Add(item);
-            }
-            resultsListView.EndUpdate();
+            loaded = stations;
+            sortColumn = -1;
+            loadedNote = extra;
+            ApplyFilter();
 
-            if (stations.Count == 0)
+            if (shown.Count > 0)
+                resultsListView.Focus();
+        }
+
+        private String loadedNote = "";
+
+        ///
+        /// The list: filter, sort, rows on demand
+        ///
+
+        /// <summary>
+        /// Show the loaded stations that match the filter: any part of the
+        /// name, genres or country, ignoring case.
+        /// </summary>
+        private void ApplyFilter()
+        {
+            String filter = filterTextBox.Text.Trim();
+
+            List<RadioStation> list;
+            if (filter.Length == 0)
             {
-                statusLabel.Text = "Nothing found.";
+                list = new List<RadioStation>(loaded);
             }
             else
             {
-                statusLabel.Text = "Found " + stations.Count + " stations, most popular first. Double-click to listen.";
-                resultsListView.Items[0].Selected = true;
-                resultsListView.Focus();
+                list = new List<RadioStation>();
+                foreach (RadioStation station in loaded)
+                {
+                    if (Contains(station.Name, filter) || Contains(station.Tags, filter) || Contains(station.Country, filter))
+                        list.Add(station);
+                }
             }
+
+            if (sortColumn >= 0)
+            {
+                // stable, so that equal ones stay most popular first:
+                List<RadioStation> order = new List<RadioStation>(list);
+                Dictionary<RadioStation, Int32> rank = new Dictionary<RadioStation, Int32>();
+                for (Int32 i = 0; i < order.Count; i++)
+                    rank[order[i]] = i;
+
+                Int32 column = sortColumn;
+                Int32 sign = sortDescending ? -1 : 1;
+                list.Sort((a, b) =>
+                {
+                    Int32 c = String.Compare(Cell(a, column), Cell(b, column), StringComparison.CurrentCultureIgnoreCase);
+                    return (c != 0) ? sign * c : rank[a] - rank[b];
+                });
+            }
+
+            shown = list;
+
+            resultsListView.BeginUpdate();
+            resultsListView.SelectedIndices.Clear();
+            resultsListView.VirtualListSize = shown.Count;
+            resultsListView.EndUpdate();
+            resultsListView.Invalidate();
+
+            if (shown.Count > 0)
+            {
+                resultsListView.SelectedIndices.Add(0);
+                resultsListView.EnsureVisible(0);
+            }
+
+            if (loaded.Count == 0)
+                statusLabel.Text = "Nothing found." + loadedNote;
+            else if (filter.Length == 0)
+                statusLabel.Text = loaded.Count + " stations, most popular first. Double-click to listen." + loadedNote;
+            else
+                statusLabel.Text = shown.Count + " of " + loaded.Count + " stations match \"" + filter + "\".";
+
             UpdateButtons();
+            NowScheduleLookUp();
+        }
+
+        private static Boolean Contains(String text, String part)
+        {
+            return text != null && text.IndexOf(part, StringComparison.CurrentCultureIgnoreCase) >= 0;
+        }
+
+        private static String Cell(RadioStation station, Int32 column)
+        {
+            switch (column)
+            {
+                case 0: return station.Name;
+                case 1: return station.Country ?? "";
+                case 2: return station.Format;
+                default: return (station.Tags ?? "").Replace(",", ", ");
+            }
+        }
+
+        private void OnRetrieveItem(Object sender, RetrieveVirtualItemEventArgs e)
+        {
+            RadioStation station = (e.ItemIndex < shown.Count) ? shown[e.ItemIndex] : null;
+            if (station == null)
+            {
+                e.Item = new ListViewItem(new String[] { "", "", "", "" });
+                return;
+            }
+
+            ListViewItem item = new ListViewItem(station.Name);
+            item.SubItems.Add(Cell(station, 1));
+            item.SubItems.Add(Cell(station, 2));
+            item.SubItems.Add(Cell(station, 3));
+            item.ToolTipText = station.StreamUri.AbsoluteUri;
+            e.Item = item;
+        }
+
+        /// <summary>
+        /// Header clicked: sort by that column, again to reverse,
+        /// a third time back to most popular first.
+        /// </summary>
+        private void OnColumnClick(Object sender, ColumnClickEventArgs e)
+        {
+            if (sortColumn != e.Column)
+            {
+                sortColumn = e.Column;
+                sortDescending = false;
+            }
+            else if (!sortDescending)
+            {
+                sortDescending = true;
+            }
+            else
+            {
+                sortColumn = -1;
+            }
+
+            ApplyFilter();
         }
 
         ///
