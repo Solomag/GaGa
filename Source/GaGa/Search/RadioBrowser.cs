@@ -198,16 +198,6 @@ namespace GaGa.Search
         }
 
         /// <summary>
-        /// Windows MediaPlayer can't decode Ogg Vorbis or Opus (Ogg FLAC is
-        /// unwrapped by the relay and listed by the directory as "FLAC").
-        /// </summary>
-        private static Boolean IsPlayableCodec(String codec)
-        {
-            String c = (codec ?? "").Trim().ToUpperInvariant();
-            return c != "OGG" && c != "OPUS" && c != "VORBIS";
-        }
-
-        /// <summary>
         /// Search the directory. Most popular stations first, broken ones left out.
         /// HLS stations are kept: the relay turns them into a plain stream.
         /// Blocking: call from a background thread.
@@ -316,7 +306,7 @@ namespace GaGa.Search
             List<RadioStation> playable = new List<RadioStation>();
             foreach (RadioStation station in stations)
             {
-                if (station.StreamUri != null && !String.IsNullOrEmpty(station.Name) && IsPlayableCodec(station.Codec))
+                if (station.StreamUri != null && !String.IsNullOrEmpty(station.Name))
                 {
                     station.Name = station.Name.Trim();
                     playable.Add(station);

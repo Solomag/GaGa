@@ -5,6 +5,7 @@
 
 using System;
 using System.IO;
+using System.Reflection;
 using System.Windows.Forms;
 
 
@@ -18,6 +19,9 @@ namespace GaGa
         [STAThread]
         private static void Main()
         {
+            // the Ogg Vorbis/Opus decoders are embedded in the exe (GaGa is a single file):
+            AppDomain.CurrentDomain.AssemblyResolve += LoadEmbeddedAssembly;
+
             // default path for the settings and the streams file:
             String currentFolder = Util.ApplicationFolder;
             String settingsFilepath = Path.Combine(currentFolder, "GaGa.dat");
@@ -26,6 +30,26 @@ namespace GaGa
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new GaGa(settingsFilepath, streamsFilepath));
+        }
+
+        /// <summary>
+        /// Load "NVorbis" or "Concentus" from the resources of the exe.
+        /// </summary>
+        private static Assembly LoadEmbeddedAssembly(Object sender, ResolveEventArgs args)
+        {
+            String name = new AssemblyName(args.Name).Name;
+            if (name != "NVorbis" && name != "Concentus")
+                return null;
+
+            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("GaGa.Libraries." + name + ".dll"))
+            {
+                if (stream == null)
+                    return null;
+
+                Byte[] data = new Byte[stream.Length];
+                stream.Read(data, 0, data.Length);
+                return Assembly.Load(data);
+            }
         }
     }
 }

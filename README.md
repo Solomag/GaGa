@@ -24,6 +24,8 @@ Issues and suggestions: https://github.com/Solomag/GaGa/issues
 
 * **https:// stations play.** Many stations moved to https, which the original could not open.
 * **Lossless FLAC streams** (Ogg FLAC) play, with no gap at track changes.
+* **Ogg Vorbis and Opus stations** play too: GaGa decodes them itself
+  (Windows can't), so every station of the directory can be played.
 * **HLS stations** (`.m3u8`, e.g. many Serbian and Russian stations) play too,
   with track titles, and show up in the station search.
 * **Current track title** shown in three places:
@@ -45,6 +47,7 @@ Issues and suggestions: https://github.com/Solomag/GaGa/issues
   even when it's already in another submenu. *Remove from favorites* takes it out again.
 * **Recording.** *Recording > Record this station* saves the stream as it
   plays (MP3, AAC or FLAC, no re-encoding) into a `Recordings` folder next to `GaGa.exe`.
+  Ogg Vorbis and Opus stations are saved decoded, as `.wav` (about 10 MB a minute).
   AAC stations are saved as `.m4a` (same audio, opens in more players), or as
   raw `.aac` if you untick *Save AAC stations as .m4a*.
 * **Start with Windows** (in *Options*), off by default.
@@ -179,7 +182,9 @@ will work, although I suggest something better such as [Notepad2][] or
 Maintained. Bug reports and requests are welcome in the [issues][Issues].
 
 GaGa stays what Beluki made it: one small executable, no installer, no
-dependencies, and a plain text file for your stations.
+dependencies, and a plain text file for your stations. (The Vorbis and Opus
+decoders, [NVorbis][] (MIT) and [Concentus][] (BSD), are built into the
+executable; their licenses are in `Source/GaGa/Libraries`.)
 
 ## License
 
@@ -191,6 +196,8 @@ Free Software, as Beluki released it: do whatever you want with it. See the
 [Issues]: https://github.com/Solomag/GaGa/issues
 [Original]: https://github.com/Beluki/GaGa
 [radio-browser.info]: https://www.radio-browser.info
+[NVorbis]: https://github.com/NVorbis/NVorbis
+[Concentus]: https://github.com/lostromb/concentus
 
 [Mono]: http://mono-project.com
 [.NET Framework]: http://www.microsoft.com/en-us/download/details.aspx?id=30653

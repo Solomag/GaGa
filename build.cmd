@@ -13,6 +13,9 @@ if not exist "%OUT%" mkdir "%OUT%"
   /win32icon:App.ico ^
   /reference:System.dll /reference:System.Drawing.dll /reference:System.Runtime.Serialization.dll /reference:System.Windows.Forms.dll ^
   /reference:"%FW%\WPF\PresentationCore.dll" /reference:"%FW%\WPF\WindowsBase.dll" ^
+  /reference:Libraries\NVorbis\NVorbis.dll /reference:Libraries\Concentus\Concentus.dll /reference:"%FW%\System.Runtime.dll" ^
+  /resource:Libraries\NVorbis\NVorbis.dll,GaGa.Libraries.NVorbis.dll ^
+  /resource:Libraries\Concentus\Concentus.dll,GaGa.Libraries.Concentus.dll ^
   /resource:StreamsFile\Resources\Streams.ini,GaGa.StreamsFile.Resources.Streams.ini ^
   /resource:NotifyIconPlayer\Resources\Buffering1.ico,GaGa.NotifyIconPlayer.Resources.Buffering1.ico ^
   /resource:NotifyIconPlayer\Resources\Buffering2.ico,GaGa.NotifyIconPlayer.Resources.Buffering2.ico ^

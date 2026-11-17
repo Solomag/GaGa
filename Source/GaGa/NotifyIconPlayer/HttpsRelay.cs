@@ -523,6 +523,10 @@ namespace GaGa.NotifyIconPlayer
             OggFlacRemuxer lastRemuxer = null;
             Boolean flacHeaderSent = false;
 
+            // decoded Ogg Vorbis/Opus keeps its WAV format across reconnections:
+            OggDecoder lastDecoder = null;
+            Boolean wavHeaderSent = false;
+
             try
             {
                 client.NoDelay = true;
@@ -577,8 +581,10 @@ namespace GaGa.NotifyIconPlayer
 
                         // Ogg streams: the MediaPlayer can't read Ogg at all, but it plays
                         // native FLAC, so Ogg FLAC is unwrapped on the fly (lossless, no re-encoding).
-                        // Anything else (including other Ogg codecs) is passed through unchanged.
-                        Boolean isOgg = contentType.IndexOf("ogg", StringComparison.OrdinalIgnoreCase) >= 0;
+                        // Ogg Vorbis and Opus are decoded and sent as WAV (see OggDecoder).
+                        // Anything else is passed through unchanged.
+                        Boolean isOgg = contentType.IndexOf("ogg", StringComparison.OrdinalIgnoreCase) >= 0
+                                     || contentType.IndexOf("opus", StringComparison.OrdinalIgnoreCase) >= 0;
                         OggFlacRemuxer remuxer = null;
                         Boolean isFlac = false;
 
@@ -590,7 +596,8 @@ namespace GaGa.NotifyIconPlayer
                             isFlac = remuxer.Start();
                         }
 
-                        String outputType = isFlac ? "audio/flac" : contentType;
+                        Boolean isDecoded = isOgg && !isFlac && OggDecoder.CanDecode(remuxer.FirstPacket);
+                        String outputType = isFlac ? "audio/flac" : isDecoded ? "audio/wav" : contentType;
 
                         // the player gets one answer; after a reconnection the audio just continues:
                         if (answeredType == null)
@@ -604,7 +611,7 @@ namespace GaGa.NotifyIconPlayer
                             answeredType = outputType;
 
                             // with FLAC, the first write is the header, which every recording needs:
-                            output = new StreamRecorder.Tee(player, Recorder, outputType, isFlac);
+                            output = new StreamRecorder.Tee(player, Recorder, outputType, isFlac || isDecoded);
                         }
 
                         lastError = null;
@@ -617,6 +624,16 @@ namespace GaGa.NotifyIconPlayer
                             Boolean writeHeader = !flacHeaderSent;
                             flacHeaderSent = true;
                             remuxer.CopyFlacTo(output, () => stopped, ReportTitle, writeHeader);
+                        }
+                        else if (isDecoded)
+                        {
+                            OggDecoder decoder = new OggDecoder(remuxer.ReadPacket, remuxer.FirstPacket);
+                            decoder.ContinueFrom(lastDecoder);
+                            lastDecoder = decoder;
+
+                            Boolean writeHeader = !wavHeaderSent;
+                            wavHeaderSent = true;
+                            decoder.CopyWavTo(output, () => stopped, ReportTitle, writeHeader);
                         }
                         else if (isOgg)
                         {

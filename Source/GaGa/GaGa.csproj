@@ -49,6 +49,14 @@
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="WindowsBase" />
+    <Reference Include="NVorbis">
+      <HintPath>Libraries\NVorbis\NVorbis.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Concentus">
+      <HintPath>Libraries\Concentus\Concentus.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assembly\AssemblyInfo.cs" />
@@ -62,6 +70,7 @@
     <Compile Include="NotifyIconPlayer\HlsStream.cs" />
     <Compile Include="NotifyIconPlayer\AacToM4a.cs" />
     <Compile Include="NotifyIconPlayer\HttpsRelay.cs" />
+    <Compile Include="NotifyIconPlayer\OggDecoder.cs" />
     <Compile Include="NotifyIconPlayer\OggFlacRemuxer.cs" />
     <Compile Include="NotifyIconPlayer\Player.cs" />
     <Compile Include="NotifyIconPlayer\PlayerStream.cs" />
@@ -85,6 +94,12 @@
     <Compile Include="Util.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Libraries\NVorbis\NVorbis.dll">
+      <LogicalName>GaGa.Libraries.NVorbis.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Libraries\Concentus\Concentus.dll">
+      <LogicalName>GaGa.Libraries.Concentus.dll</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="StreamsFile\Resources\Streams.ini" />
   </ItemGroup>
   <ItemGroup>

@@ -162,6 +162,24 @@ namespace GaGa.NotifyIconPlayer
         }
 
         /// <summary>
+        /// The first packet read by Start() (tells the codec).
+        /// </summary>
+        public Byte[] FirstPacket
+        {
+            get { return firstPacket; }
+        }
+
+        /// <summary>
+        /// The next packet, for decoding other codecs (see OggDecoder).
+        /// Null at the end of the stream.
+        /// </summary>
+        public Byte[] ReadPacket()
+        {
+            sniffed = null;
+            return NextPacket();
+        }
+
+        /// <summary>
         /// Write a native FLAC stream: "fLaC" + STREAMINFO, then audio frames.
         /// </summary>
         public void CopyFlacTo(Stream output, Func<Boolean> stopped, Action<String> onTitle, Boolean writeHeader = true)
