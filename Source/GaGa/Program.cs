@@ -6,6 +6,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using System.Windows.Forms;
 
 
@@ -27,9 +28,38 @@ namespace GaGa
             String settingsFilepath = Path.Combine(currentFolder, "GaGa.dat");
             String streamsFilepath = Path.Combine(currentFolder, "Streams.ini");
 
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new GaGa(settingsFilepath, streamsFilepath));
+            // one GaGa per user session: a second copy (started twice with Windows,
+            // a double click while it runs) just leaves. After an update the new exe
+            // starts while the old one is still closing, so wait for it a little:
+            using (Mutex single = new Mutex(false, @"Local\GaGa-Radio-Player-SingleInstance"))
+            {
+                if (!Acquire(single, TimeSpan.FromSeconds(15)))
+                    return;
+
+                try
+                {
+                    Application.EnableVisualStyles();
+                    Application.SetCompatibleTextRenderingDefault(false);
+                    Application.Run(new GaGa(settingsFilepath, streamsFilepath));
+                }
+                finally
+                {
+                    single.ReleaseMutex();
+                }
+            }
+        }
+
+        private static Boolean Acquire(Mutex mutex, TimeSpan timeout)
+        {
+            try
+            {
+                return mutex.WaitOne(timeout);
+            }
+            catch (AbandonedMutexException)
+            {
+                // the previous GaGa crashed or was killed: it's ours now
+                return true;
+            }
         }
 
         /// <summary>
