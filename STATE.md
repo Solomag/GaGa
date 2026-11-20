@@ -5,8 +5,8 @@
 - macOS: Swift/AppKit порт, `macOS/`.
 
 ## Версия
-- Выпущена 2026.11.17: Ogg Vorbis/Opus через декодирование в WAV (NVorbis + Concentus вшиты в exe).
-- После неё в работе: один экземпляр на пользователя (Mutex в `Program.cs`). Повод — у Игоря два пункта автозагрузки, и оба GaGa обновлялись одновременно. Не выпущено.
+- 2026.11.20 (текущая): один экземпляр на пользователя (Mutex в `Program.cs`). Повод — у Игоря два пункта автозагрузки, и обе GaGa обновлялись одновременно.
+- 2026.11.17: Ogg Vorbis/Opus через декодирование в WAV (NVorbis + Concentus вшиты в exe).
 
 ## Сборка и выпуск
 - Сборка: `powershell -NoProfile -Command "& cmd.exe /c E:\Radio\GaGa\build.cmd [outdir]"` (csc из .NET 4, без VS).
